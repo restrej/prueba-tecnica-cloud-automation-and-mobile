@@ -92,7 +92,7 @@ Para la notificación de Slack se debe crear el secreto `SLACK_WEBHOOK_URL` en *
 | Prueba de carga 5.2 (50 usuarios, 5 min) | 12.829 peticiones · p50 53 ms · p95 59 ms · p99 66 ms · 0% errores |
 | OWASP ZAP | 113 verificaciones superadas · 0 fallas · 1 advertencia menor |
 | Bandit | 0 hallazgos abiertos |
-| Pruebas móviles (Appium) | Ver la última ejecución de `mobile.yml` en la pestaña *Actions* |
+| Pruebas móviles (Appium) | 5 de 5 en verde en 2 emuladores: Pixel 6 (Android 14) y Nexus 5 (Android 11) — [ejecución](https://github.com/restrej/prueba-tecnica-cloud-automation-and-mobile/actions/runs/36823127482) |
 
 ## Cómo regenerar el PDF
 

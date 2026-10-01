@@ -377,7 +377,9 @@ diferentes pantallas.*
 - **Esperas:** nunca uso pausas fijas ("espera 5 segundos"). Uso **esperas inteligentes**: "espera **hasta** que
   aparezca el elemento, máximo 15 segundos". Si aparece en medio segundo, la prueba sigue en medio segundo.
 - **Diferentes pantallas:** la misma suite se ejecuta en varios emuladores (Pixel 6 con Android 14 y Nexus 5 con
-  pantalla pequeña y Android 11); en la versión candidata, en celulares reales del almacén.
+  pantalla pequeña y Android 11); en la versión candidata, en celulares reales del almacén. Caso real: en el Nexus 5
+  el botón "Rechazar" quedaba debajo del borde de la pantalla (el teclado ocupaba la mitad). Por eso la acción de
+  tocar primero oculta el teclado y, si el botón no está a la vista, **desplaza la pantalla** hasta encontrarlo.
 
 ### C.3 Código: login y uso de elementos de Flutter (2 puntos)
 
