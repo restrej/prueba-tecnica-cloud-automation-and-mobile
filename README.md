@@ -124,9 +124,22 @@ Abre `reports/reporte.html` para ver el resultado.
 | UI Playwright (Ejercicio B) | 18 OK |
 | Mobile | 7 pruebas unitarias del framework OK · 5 E2E de Appium listas (se saltan si no hay emulador) · 5 widget tests de Flutter OK |
 | k6 5.2 (50 VUs, 5 min) | 12.826 peticiones · 42,6 req/s · p50 53 ms · p95 57 ms · p99 61 ms · 0% errores |
-| SAST (Bandit, Ruff) | 0 hallazgos abiertos |
+| SAST (Bandit, Ruff, Semgrep) | 0 hallazgos abiertos |
 | DAST (OWASP ZAP API scan) | 113 reglas OK · 0 FAIL · 1 WARN (Content-Type en rutas 404) |
 | Flaky demo | 7 pasa / 3 falla en 10 ejecuciones → clasificado FLAKY |
+| **GitHub Actions** (`ci.yml`) | [Ejecución #2](https://github.com/restrej/prueba-tecnica-cloud-automation-and-mobile/actions/runs/36812798479): 7/7 jobs en verde en ≈ 4 min |
+
+## Documento entregable (PDF)
+
+El entregable pedido por la prueba está en
+[`docs/entregable/Prueba_Tecnica_Senior_QA_LogiTrack.pdf`](docs/entregable/Prueba_Tecnica_Senior_QA_LogiTrack.pdf).
+Se genera a partir de las respuestas en Markdown de [`docs/respuestas/`](docs/respuestas/) (que también se leen
+directamente en GitHub, con sus diagramas):
+
+```bash
+pip install markdown && npm install mermaid@11
+python docs/entregable/build_pdf.py --mermaid node_modules/mermaid/dist/mermaid.min.js
+```
 
 ## CI/CD
 
