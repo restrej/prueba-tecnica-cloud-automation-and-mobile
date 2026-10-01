@@ -375,7 +375,7 @@ reportes en la sección **Artifacts** (abajo en la página de la ejecución).
 5. En GitHub, en tu repositorio: **Settings → Secrets and variables → Actions → New repository secret** →
    *Name*: `SLACK_WEBHOOK_URL` → *Secret*: pega la URL → **Add secret**.
 6. Prueba: pestaña **Actions** → "Ejemplo 3.3 - Pruebas con reporte y notificación" → **Run workflow** →
-   elige la rama `claude/sweet-gauss-v7c00d` → **Run workflow**. En 1 o 2 minutos llega el mensaje al canal.
+   elige la rama `restrej/prueba-tecnica-logitrack` → **Run workflow**. En 1 o 2 minutos llega el mensaje al canal.
 
 **Proteger la rama main (Parte 3.2):** *Settings → Branches → Add branch protection rule* →
 `main` → marcar *Require a pull request before merging*, *Require approvals (1)*,
