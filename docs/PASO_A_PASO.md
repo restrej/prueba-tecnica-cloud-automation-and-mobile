@@ -71,7 +71,7 @@ proyecto, así sus librerías no se mezclan con las de otros proyectos.
 $ python3 -m venv .venv
 $ source .venv/bin/activate
 $ pip install -r requirements.txt
-$ python -m playwright install chromium
+$ python -m playwright install chrome firefox webkit
 ```
 
 **Windows (PowerShell)**
@@ -79,11 +79,11 @@ $ python -m playwright install chromium
 $ python -m venv .venv
 $ .venv\Scripts\Activate.ps1
 $ pip install -r requirements.txt
-$ python -m playwright install chromium
+$ python -m playwright install chrome firefox webkit
 ```
 
 ✅ **Deberías ver** `(.venv)` al inicio de la línea de la terminal.
-La última línea descarga el navegador que usa Playwright.
+La última línea descarga los 3 navegadores de las pruebas web: **Google Chrome**, **Firefox** y **WebKit** (el motor de Safari).
 
 > Si PowerShell no deja activar el entorno: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 > **Cada vez que abras una terminal nueva** debes volver a activar el entorno (`source .venv/bin/activate`).
@@ -181,9 +181,14 @@ SQL/NoSQL/command injection, XSS, payloads malformados, headers de seguridad, CO
 ## Paso 9. Pruebas de UI web con Playwright (Parte 4, Ejercicio B)
 
 ```bash
-$ pytest tests/ui -v                       # sin ver el navegador (rápido)
-$ pytest tests/ui --headed --slowmo 500    # VIENDO el navegador, en cámara lenta
+$ pytest tests/ui --browser-channel chrome          # en Google Chrome
+$ pytest tests/ui --browser firefox                 # en Firefox
+$ pytest tests/ui --browser webkit                  # en WebKit (motor de Safari)
+$ pytest tests/ui --browser-channel chrome --headed --slowmo 500   # VIENDO Chrome, en cámara lenta
 ```
+
+El código de las pruebas es el mismo para los 3 navegadores; sólo cambia la opción del comando.
+En GitHub Actions los 3 se ejecutan en paralelo (job `UI web` en `ci.yml`).
 
 ✅ 18 pruebas: login exitoso, credenciales inválidas, validaciones de campos, longitud
 máxima, enlace "¿Olvidaste tu contraseña?", etc.

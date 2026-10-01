@@ -4,8 +4,8 @@
 # Qué hace (en orden):
 #   1. static-analysis : lint + SAST (Bandit) + SCA (pip-audit)                ~1 min
 #   2. unit-integration: unit + integration + contract con COVERAGE GATE 80%   ~2 min
-#   3. functional-tests: API + seguridad + UI (Playwright) -> reporte HTML/JUnit
-#                        + QUALITY GATE (falla si hay tests CRÍTICOS en rojo) ~4 min
+#   3. functional-tests: API + seguridad -> reporte HTML/JUnit + QUALITY GATE    ~2 min
+#      ui-tests        : web en Chrome, Firefox y WebKit (en paralelo) + gate   ~3 min
 #   4. performance-smoke: k6 corto con umbrales (p95/p99/errores)              ~2 min
 #   5. dast-zap        : OWASP ZAP ataca la API levantada                      ~5 min
 #   6. quarantine      : tests flaky aislados + reporte (NO bloquea)           ~1 min
@@ -101,10 +101,10 @@ jobs:
           retention-days: 14
 
   # ===========================================================================
-  # 3. PRUEBAS FUNCIONALES (API + SEGURIDAD + UI WEB) + QUALITY GATE
+  # 3a. PRUEBAS DE API Y SEGURIDAD + QUALITY GATE (no necesitan navegador)
   # ===========================================================================
   functional-tests:
-    name: API + Security + UI (Playwright)
+    name: API + Security
     runs-on: ubuntu-latest
     needs: unit-integration               # sólo corre si unit/integration pasó (fail fast)
     timeout-minutes: 15
@@ -116,35 +116,80 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
-      - name: Instalar navegador Chromium para Playwright
-        run: python -m playwright install --with-deps chromium
-
-      - name: Ejecutar pruebas funcionales
-        id: tests
+      - name: Ejecutar pruebas de API y seguridad
         # continue-on-error: dejamos que termine para que el QUALITY GATE decida
         # (los no críticos pueden fallar dentro del umbral; los críticos bloquean).
         continue-on-error: true
         # El servidor bajo prueba lo levanta conftest.py automáticamente.
         # --reruns 1: un reintento para fallos transitorios (queda registrado en el reporte).
         run: >
-          pytest -m "(api or security or ui) and not quarantine"
+          pytest -m "(api or security) and not quarantine"
           --reruns 1 --reruns-delay 1
-          --junitxml=reports/junit-functional.xml
-          --html=reports/functional-report.html --self-contained-html
-          --screenshot only-on-failure --tracing retain-on-failure --output reports/playwright
+          --junitxml=reports/junit-api-security.xml
+          --html=reports/api-security-report.html --self-contained-html
 
       - name: Publicar reportes como artefacto
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: functional-test-reports
+          name: api-security-reports
           path: reports/
           retention-days: 14
 
       - name: QUALITY GATE - bloquear si hay tests críticos en rojo
         # Lee el JUnit, escribe un resumen en la página de la ejecución y
         # devuelve exit code 1 si falló algún test @critical o la tasa de éxito < 95%.
-        run: python tools/quality_gate.py "reports/junit-functional.xml"
+        run: python tools/quality_gate.py "reports/junit-api-security.xml"
+
+  # ===========================================================================
+  # 3b. PRUEBAS WEB EN 3 NAVEGADORES: Google Chrome, Firefox y WebKit (Safari)
+  #     "matrix" crea 3 copias de este job, una por navegador, que corren en paralelo.
+  # ===========================================================================
+  ui-tests:
+    name: UI web (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: unit-integration
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false                    # si falla un navegador, los otros terminan igual
+      matrix:
+        browser: [chrome, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Instalar el navegador ${{ matrix.browser }}
+        # "chrome" instala Google Chrome oficial; firefox y webkit los provee Playwright.
+        run: python -m playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Ejecutar pruebas web en ${{ matrix.browser }}
+        continue-on-error: true
+        # Chrome se elige con --browser chromium + --browser-channel chrome (el Chrome real).
+        run: |
+          if [ "${{ matrix.browser }}" = "chrome" ]; then
+            BROWSER_ARGS="--browser chromium --browser-channel chrome"
+          else
+            BROWSER_ARGS="--browser ${{ matrix.browser }}"
+          fi
+          pytest tests/ui $BROWSER_ARGS --reruns 1 --reruns-delay 1 \
+            --junitxml=reports/junit-ui-${{ matrix.browser }}.xml \
+            --html=reports/ui-report-${{ matrix.browser }}.html --self-contained-html \
+            --screenshot only-on-failure --output reports/playwright
+
+      - name: Publicar reportes como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-reports-${{ matrix.browser }}
+          path: reports/
+          retention-days: 14
+
+      - name: QUALITY GATE - bloquear si hay tests críticos en rojo
+        run: python tools/quality_gate.py "reports/junit-ui-${{ matrix.browser }}.xml"
 
   # ===========================================================================
   # 4. SMOKE DE RENDIMIENTO CON K6 (umbrales de p95/p99/errores)
@@ -254,7 +299,7 @@ jobs:
     name: Notificar resultado
     runs-on: ubuntu-latest
     # Espera a todos los jobs bloqueantes y se ejecuta SIEMPRE (pasen o fallen).
-    needs: [static-analysis, unit-integration, functional-tests, performance-smoke, dast-zap]
+    needs: [static-analysis, unit-integration, functional-tests, ui-tests, performance-smoke, dast-zap]
     if: always()
     steps:
       - name: Calcular estado final
@@ -278,7 +323,7 @@ jobs:
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -sf -X POST -H 'Content-Type: application/json' "$SLACK_WEBHOOK_URL" -d @- <<EOF
           {
-            "text": "${{ steps.status.outputs.emoji }} *LogiTrack CI ${{ steps.status.outputs.text }}*\n• Repo: ${{ github.repository }}\n• Rama: ${{ github.ref_name }}\n• Autor: ${{ github.actor }}\n• Estáticos: ${{ needs.static-analysis.result }} | Unit: ${{ needs.unit-integration.result }} | Funcionales: ${{ needs.functional-tests.result }} | k6: ${{ needs.performance-smoke.result }} | ZAP: ${{ needs.dast-zap.result }}\n• Reportes: $RUN_URL"
+            "text": "${{ steps.status.outputs.emoji }} *LogiTrack CI ${{ steps.status.outputs.text }}*\n• Repo: ${{ github.repository }}\n• Rama: ${{ github.ref_name }}\n• Autor: ${{ github.actor }}\n• Estáticos: ${{ needs.static-analysis.result }} | Unit: ${{ needs.unit-integration.result }} | API+Seguridad: ${{ needs.functional-tests.result }} | Web (Chrome/Firefox/WebKit): ${{ needs.ui-tests.result }} | k6: ${{ needs.performance-smoke.result }} | ZAP: ${{ needs.dast-zap.result }}\n• Reportes: $RUN_URL"
           }
           EOF
 
@@ -290,7 +335,8 @@ jobs:
             echo "|---|---|"
             echo "| Lint + SAST + SCA | ${{ needs.static-analysis.result }} |"
             echo "| Unit + Integration + Contract | ${{ needs.unit-integration.result }} |"
-            echo "| API + Security + UI | ${{ needs.functional-tests.result }} |"
+            echo "| API + Security | ${{ needs.functional-tests.result }} |"
+            echo "| UI web (Chrome, Firefox, WebKit) | ${{ needs.ui-tests.result }} |"
             echo "| Performance (k6) | ${{ needs.performance-smoke.result }} |"
             echo "| DAST (ZAP) | ${{ needs.dast-zap.result }} |"
           } >> "$GITHUB_STEP_SUMMARY"

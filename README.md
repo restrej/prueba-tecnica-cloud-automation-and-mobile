@@ -17,7 +17,7 @@ para la plataforma ficticia **LogiTrack**: estrategia de calidad, automatizació
 |---|---|---|
 | Lenguaje y runner de pruebas | **Python 3.11 + pytest** | Sintaxis simple, fixtures, markers para armar suites, gran ecosistema |
 | API testing | **pytest + httpx** + JSON Schema | Cliente HTTP simple; contratos validados con `jsonschema` |
-| UI web | **Playwright** (Python) | Espera automática (menos flaky), locators por `data-testid`/rol, trazas y capturas |
+| UI web | **Playwright** (Python) en **Chrome, Firefox y WebKit** | Espera automática (menos flaky), locators por `data-testid`/rol, trazas y capturas |
 | Mobile | **Appium** (UiAutomator2/XCUITest) + Python | Caja negra sobre el APK real, multiplataforma, mismo lenguaje que el resto |
 | Rendimiento | **k6** | Scripts en JS versionables, umbrales que hacen fallar el pipeline, bajo consumo |
 | Seguridad | **pytest (OWASP)** + **Bandit** (SAST) + **pip-audit** (SCA) + **OWASP ZAP** (DAST) | Gratuitas y automatizables en CI |
@@ -41,7 +41,7 @@ git clone https://github.com/restrej/prueba-tecnica-cloud-automation-and-mobile.
 cd prueba-tecnica-cloud-automation-and-mobile
 python3 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python -m playwright install chromium
+python -m playwright install chrome firefox webkit
 
 # Ejecuta TODO lo que no necesita emulador (la API simulada se levanta sola)
 pytest -m "not quarantine and not mobile" --html=reports/reporte.html --self-contained-html
@@ -56,7 +56,7 @@ Abre `reports/reporte.html` para ver el resultado.
 | Ver la API y la web | `uvicorn sut.main:app --port 8000` → <http://localhost:8000/docs> y <http://localhost:8000/control/login> |
 | Unitarias + integración + contrato con coverage gate (80%) | `pytest tests/unit tests/integration tests/contract --cov` |
 | API (Ejercicio A) | `pytest -m api` |
-| UI web (Ejercicio B) | `pytest tests/ui` (agrega `--headed --slowmo 500` para ver el navegador) |
+| UI web (Ejercicio B) | `pytest tests/ui --browser-channel chrome` · `--browser firefox` · `--browser webkit` (agrega `--headed` para ver el navegador) |
 | Mobile (Ejercicio C) | `pytest tests/mobile` (requiere Appium + emulador; ver paso 13) |
 | Seguridad (5.3) | `pytest -m security` |
 | Sólo tests críticos / smoke | `pytest -m critical` / `pytest -m smoke` |
