@@ -149,7 +149,7 @@ jobs:
     name: UI web (${{ matrix.browser }})
     runs-on: ubuntu-latest
     needs: unit-integration
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false                    # si falla un navegador, los otros terminan igual
       matrix:
@@ -169,7 +169,12 @@ jobs:
           if [ "${{ matrix.browser }}" = "chrome" ] && command -v google-chrome; then
             google-chrome --version
           else
-            python -m playwright install --with-deps ${{ matrix.browser }}
+            # Hasta 3 intentos de máximo 5 minutos: a veces la descarga de paquetes se queda colgada.
+            for intento in 1 2 3; do
+              timeout 300 python -m playwright install --with-deps ${{ matrix.browser }} && exit 0
+              echo "Intento $intento falló o tardó demasiado; reintentando..."
+            done
+            exit 1
           fi
 
       - name: Ejecutar pruebas web en ${{ matrix.browser }}
