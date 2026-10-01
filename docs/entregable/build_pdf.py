@@ -52,6 +52,27 @@ figcaption { font-size: 8.3pt; color: #55627a; }
 """
 
 
+def compose_mobile_strip() -> None:
+    """
+    Si existen capturas de Appium en docs/img/mobile/ (01-login.png ... 05-guia-generada.png),
+    las une en una sola imagen horizontal docs/img/mobile-flujo.png (requiere Pillow).
+    """
+    shots = sorted((ROOT / "docs" / "img" / "mobile").glob("0*.png"))
+    if not shots:
+        return
+    from PIL import Image  # import local: sólo se necesita si hay capturas móviles
+
+    height = 900
+    images = [Image.open(path) for path in shots]
+    images = [img.resize((int(img.width * height / img.height), height)) for img in images]
+    strip = Image.new("RGB", (sum(img.width for img in images) + 20 * (len(images) - 1), height), "white")
+    x = 0
+    for img in images:
+        strip.paste(img, (x, 0))
+        x += img.width + 20
+    strip.save(ROOT / "docs" / "img" / "mobile-flujo.png")
+
+
 def insert_files(text: str) -> str:
     """Reemplaza {{archivo:ruta}} por el contenido COMPLETO de ese archivo, como bloque de código."""
     def replace(match: re.Match) -> str:
@@ -96,6 +117,7 @@ def main() -> None:
     parser.add_argument("--mermaid", help="Ruta a mermaid.min.js para dibujar los diagramas")
     args = parser.parse_args()
 
+    compose_mobile_strip()
     html_path = OUTPUT.with_suffix(".html")
     html_path.write_text(build_html(args.mermaid), encoding="utf-8")
     with sync_playwright() as p:

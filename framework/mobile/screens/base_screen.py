@@ -14,7 +14,12 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from framework.mobile.locators import FOCUSED_INPUT_ANDROID, editable_child_android, flutter_id
+from framework.mobile.locators import (
+    FOCUSED_INPUT_ANDROID,
+    editable_child_android,
+    flutter_id,
+    scroll_into_view_android,
+)
 
 # Tiempo máximo de espera por elemento (configurable para dispositivos lentos / granjas en la nube).
 DEFAULT_TIMEOUT = int(os.getenv("MOBILE_WAIT_TIMEOUT", "15"))
@@ -37,8 +42,25 @@ class BaseScreen:
         return self.wait.until(EC.visibility_of_element_located(flutter_id(identifier)))
 
     def tap(self, identifier: str) -> None:
-        """Espera a que el elemento sea CLICKEABLE (visible + habilitado) y lo toca."""
-        self.wait.until(EC.element_to_be_clickable(flutter_id(identifier))).click()
+        """
+        Espera a que el elemento sea CLICKEABLE (visible + habilitado) y lo toca.
+
+        En pantallas pequeñas el botón puede quedar debajo del borde (o detrás del teclado):
+        si no aparece en unos segundos, desplazamos la pantalla hasta encontrarlo.
+        """
+        self.hide_keyboard()
+        try:
+            element = WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable(flutter_id(identifier)))
+        except TimeoutException:
+            self.scroll_to(identifier)
+            element = self.wait.until(EC.element_to_be_clickable(flutter_id(identifier)))
+        element.click()
+
+    def scroll_to(self, identifier: str) -> None:
+        """Desplaza la pantalla hasta que aparezca el elemento (sólo Android, con UiScrollable)."""
+        if self.driver.capabilities.get("platformName", "").lower() != "android":
+            return
+        self.driver.find_element(*scroll_into_view_android(identifier))
 
     def focus_input(self, identifier: str):
         """

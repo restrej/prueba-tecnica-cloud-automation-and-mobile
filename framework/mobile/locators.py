@@ -31,6 +31,15 @@ def editable_child_android(identifier: str) -> tuple[str, str]:
     )
 
 
+def scroll_into_view_android(identifier: str) -> tuple[str, str]:
+    """Locator que, al buscarlo, DESPLAZA la lista hasta que el elemento sea visible (UiScrollable)."""
+    return (
+        AppiumBy.ANDROID_UIAUTOMATOR,
+        "new UiScrollable(new UiSelector().scrollable(true))"
+        f'.scrollIntoView(new UiSelector().resourceId("{identifier}"))',
+    )
+
+
 def flutter_id(identifier: str) -> tuple[str, str]:
     """
     Devuelve el locator (estrategia, valor) para un ``Semantics(identifier: ...)``.

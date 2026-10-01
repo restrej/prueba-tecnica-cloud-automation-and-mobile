@@ -408,11 +408,10 @@ Semantics(identifier: 'login-button',
           child: FilledButton(onPressed: _login, child: const Text('Ingresar')))
 ```
 
-Capturas reales tomadas por Appium durante la prueba en el emulador:
+**Resultado real:** las 5 pruebas de Appium pasaron en GitHub Actions sobre un emulador Android (la app se compila,
+se instala y se prueba automáticamente en cada ejecución). Capturas tomadas por Appium durante el flujo completo:
 
-![Appium: login, lista de pedidos y detalle](../img/mobile-flujo-1.png)
-
-![Appium: productos escaneados y guía generada](../img/mobile-flujo-2.png)
+![Appium en el emulador: login, lista de pedidos, detalle, productos escaneados y guía generada](../img/mobile-flujo.png)
 
 # Parte 5. Pruebas de rendimiento y seguridad (10 puntos)
 
@@ -573,8 +572,13 @@ abajo; (5) corregir la causa y confirmar con 50 ejecuciones seguidas en verde.
 | **Infraestructura** | Las fallas coinciden con arranques lentos de Cloud Run, CPU alta del emulador o red lenta | Más recursos o un ambiente de pruebas dedicado |
 | **Tiempo de espera mal configurado** | Falla justo al llegar al límite (por ejemplo, a los 10 s) y la operación termina a los 12 s | Ajustar el tiempo con datos reales: el tiempo del 99% más un margen |
 
-Demostración real de una **condición de carrera**: sin el bloqueo, dos supervisores "ganan" el mismo pedido
-(`[201, 201]`) y la prueba lo detecta (ver la captura de la Parte 3.3).
+**Dos casos reales que viví en este proyecto:**
+- **Condición de carrera:** sin el bloqueo, dos supervisores "ganan" el mismo pedido (`[201, 201]`) y la prueba lo
+  detecta (ver la captura de la Parte 3.3).
+- **Infraestructura:** las pruebas de Appium pasaban en un emulador (Nexus 5) y fallaban en otro (Pixel 6) sin
+  cambiar el código. Agregué un diagnóstico que, al fallar, guarda la estructura de la pantalla; mostró la ventana
+  del sistema *"Pixel Launcher isn't responding"* tapando la app. No era la prueba ni la app: era el emulador.
+  Solución: más memoria al emulador y ocultar las ventanas de error del sistema antes de probar.
 
 ## 6.3 Gestión de pruebas inestables (2 puntos)
 

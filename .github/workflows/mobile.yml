@@ -124,7 +124,7 @@ jobs:
           script: |
             adb shell settings put global hide_error_dialogs 1
             adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
-            pytest -m mobile -rA --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
+            pytest -m mobile -rA --reruns 1 --reruns-delay 3 --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
 
       - name: Quality gate mobile
         if: always()
