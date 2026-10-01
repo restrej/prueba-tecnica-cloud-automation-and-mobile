@@ -1,0 +1,88 @@
+# =============================================================================
+# pyproject.toml: configuración central de herramientas Python del proyecto.
+# =============================================================================
+
+[project]
+name = "logitrack-qa-framework"
+version = "1.0.0"
+description = "Framework de calidad para LogiTrack: API, UI, Mobile, Performance y Seguridad"
+requires-python = ">=3.11"
+
+# -----------------------------------------------------------------------------
+# Configuración de pytest
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+# Carpeta raíz donde pytest busca pruebas.
+testpaths = ["tests"]
+# Opciones por defecto:
+#  -ra            -> resumen final con el motivo de skips/fallos
+#  --strict-markers -> falla si se usa un marker no registrado (evita typos)
+#  --strict-config  -> falla si hay errores de configuración
+addopts = "-ra --strict-markers --strict-config"
+# Markers = etiquetas que clasifican las pruebas. Permiten construir suites:
+#   pytest -m "smoke"            -> sólo smoke
+#   pytest -m "api and critical" -> pruebas de API críticas
+markers = [
+    "unit: pruebas unitarias de lógica de negocio (rápidas, sin red)",
+    "integration: pruebas de integración entre componentes (API + Pub/Sub simulado)",
+    "contract: pruebas de contrato (OpenAPI y esquema de eventos Pub/Sub)",
+    "api: pruebas funcionales de API REST contra el servicio desplegado",
+    "ui: pruebas de interfaz web (Centro de Control) con Playwright",
+    "mobile: pruebas de la app PickApp con Appium (requieren emulador/dispositivo)",
+    "security: pruebas de seguridad (authz, inyección, headers, rate limiting)",
+    "smoke: subconjunto mínimo que valida que el sistema está vivo",
+    "regression: suite de regresión",
+    "critical: si falla, el pipeline se bloquea (quality gate)",
+    "concurrency: pruebas de condiciones de carrera",
+    "quarantine: test inestable aislado; se ejecuta pero no bloquea el pipeline",
+]
+# Python con el que pytest descubre el código (raíz del repo en sys.path).
+pythonpath = ["."]
+# Registro en vivo de logs del framework durante la ejecución (útil en CI).
+log_cli = false
+# Ocultamos un aviso de deprecación interno de la librería starlette (no es de nuestro código).
+filterwarnings = ["ignore:Using `httpx` with"]
+log_level = "INFO"
+# Navegador por defecto de pytest-playwright (se puede cambiar con --browser).
+# (Se configura en la línea de comandos/CI; aquí dejamos el resto por defecto.)
+
+# -----------------------------------------------------------------------------
+# Configuración de cobertura (coverage.py vía pytest-cov)
+# -----------------------------------------------------------------------------
+[tool.coverage.run]
+# Medimos cobertura del código del servicio (sut), que es "el producto".
+source = ["sut"]
+branch = true   # Cobertura de ramas (if/else), más exigente que sólo líneas.
+
+[tool.coverage.report]
+# Coverage gate: si la cobertura baja de 80% el comando falla (exit code != 0).
+fail_under = 80
+show_missing = true
+skip_covered = false
+
+# -----------------------------------------------------------------------------
+# Ruff (linter)
+# -----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = ["mobile-app", ".venv"]
+
+[tool.ruff.lint]
+# E/F = errores básicos, I = orden de imports, B = bugs comunes, S = seguridad (bandit)
+select = ["E", "F", "I", "B", "UP", "S"]
+# S101 = uso de assert; en tests es exactamente lo que queremos.
+# B008 = "Depends(...)" en parámetros: es el patrón oficial de FastAPI.
+ignore = ["S101", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# En tests se permiten credenciales de prueba y bucles de requests.
+"tests/**" = ["S105", "S106", "S107", "S113", "S311"]
+"framework/**" = ["S105", "S106"]
+"tools/**" = ["S314", "S603"]
+
+# -----------------------------------------------------------------------------
+# Bandit (SAST)
+# -----------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "mobile-app"]

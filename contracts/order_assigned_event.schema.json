@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://logitrack.example/contracts/order_assigned_event.v1.schema.json",
+  "title": "Evento Pub/Sub order.assigned v1.0",
+  "description": "Mensaje que orders-api publica en el topic 'order-assigned'. Lo consumen inventory-service y notifications-service. Cambios incompatibles requieren una nueva versión (eventVersion 2.0) y un topic o atributo de versión distinto.",
+  "type": "object",
+  "required": ["eventType", "eventVersion", "assignmentId", "orderId", "operatorId", "warehouseId", "priority", "occurredAt"],
+  "properties": {
+    "eventType": { "const": "order.assigned" },
+    "eventVersion": { "type": "string", "pattern": "^1\\.\\d+$" },
+    "assignmentId": { "type": "string", "pattern": "^ASG-\\d+$" },
+    "orderId": { "type": "string", "pattern": "^ORD-\\d{4}-\\d{6}$" },
+    "operatorId": { "type": "string", "pattern": "^OP-\\d{1,6}$" },
+    "warehouseId": { "type": "string", "pattern": "^WH-\\d{2}$" },
+    "priority": { "enum": ["NORMAL", "URGENT", "EXPRESS"] },
+    "occurredAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,19 @@
+# Configuración de reglas de OWASP ZAP (separado por TABULADOR).
+# Formato: <id_regla>	<acción>	(<descripción>)
+# Acciones: FAIL = bloquea el pipeline | WARN = sólo avisa | IGNORE = no reportar | INFO = informativo
+# Política: las vulnerabilidades de inyección y de exposición de datos BLOQUEAN el release.
+40018	FAIL	(SQL Injection)
+40019	FAIL	(SQL Injection - MySQL)
+40020	FAIL	(SQL Injection - Hypersonic SQL)
+40022	FAIL	(SQL Injection - PostgreSQL)
+40012	FAIL	(Cross Site Scripting - Reflected)
+40014	FAIL	(Cross Site Scripting - Persistent)
+90020	FAIL	(Remote OS Command Injection)
+6	FAIL	(Path Traversal)
+7	FAIL	(Remote File Inclusion)
+90019	FAIL	(Server Side Include)
+40009	FAIL	(Server Side Include)
+10010	WARN	(Cookie No HttpOnly Flag)
+10021	FAIL	(X-Content-Type-Options Header Missing)
+10038	WARN	(Content Security Policy Header Not Set)
+10098	WARN	(Cross-Domain Misconfiguration)

@@ -1,0 +1,122 @@
+# =============================================================================
+# Pipeline MOBILE: compila PickApp (Flutter), levanta un emulador Android,
+# inicia Appium y ejecuta la suite tests/mobile en VARIOS dispositivos (matriz).
+#
+# Es más lento y costoso (~20-25 min) que el CI principal, por eso corre:
+#   - manualmente (workflow_dispatch) y
+#   - todas las noches (schedule), y en cada Release Candidate (tag rc-*).
+# =============================================================================
+
+name: Mobile - Appium E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1-5"           # 06:00 UTC de lunes a viernes (antes de abrir almacenes)
+  push:
+    tags: ["rc-*"]                  # Release Candidates
+
+permissions:
+  contents: read
+
+jobs:
+  # Pruebas rápidas de widgets de Flutter (sin emulador).
+  flutter-widget-tests:
+    name: Flutter widget tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.5"
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  appium-e2e:
+    name: Appium E2E (${{ matrix.device.name }})
+    needs: flutter-widget-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # MATRIZ DE DISPOSITIVOS: la misma suite se ejecuta en resoluciones/versiones distintas.
+    strategy:
+      fail-fast: false              # si falla un dispositivo, los demás siguen
+      matrix:
+        device:
+          - { name: "Pixel 6 - Android 14", api: 34, profile: "pixel_6" }
+          - { name: "Nexus 5 - Android 11 (pantalla chica)", api: 30, profile: "Nexus 5" }
+    steps:
+      - uses: actions/checkout@v4
+
+      # Habilita aceleración KVM: sin ella el emulador sería extremadamente lento.
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.5"
+          channel: stable
+
+      - name: Compilar APK de PickApp
+        working-directory: mobile-app
+        run: flutter build apk --debug
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar Appium y el driver UiAutomator2
+        run: |
+          npm install -g appium
+          appium driver install uiautomator2
+
+      - name: Iniciar servidor Appium en segundo plano
+        # Se inicia ANTES del emulador: el runner del emulador ejecuta cada línea
+        # de su "script" en una shell distinta, y un proceso en background podría perderse.
+        run: |
+          nohup appium --log appium.log --allow-insecure=adb_shell > /dev/null 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4723/status && break; sleep 1; done
+
+      - name: Ejecutar suite mobile en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_DEVICE_NAME: ${{ matrix.device.name }}
+        with:
+          api-level: ${{ matrix.device.api }}
+          profile: ${{ matrix.device.profile }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true    # menos flakiness
+          # El script corre cuando el emulador ya arrancó.
+          script: pytest -m mobile --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
+
+      - name: Quality gate mobile
+        if: always()
+        run: python tools/quality_gate.py "reports/junit-mobile.xml"
+
+      - name: Publicar reportes y capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-report-api${{ matrix.device.api }}
+          path: |
+            reports/
+            appium.log

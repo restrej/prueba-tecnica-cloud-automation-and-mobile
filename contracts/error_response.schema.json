@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://logitrack.example/contracts/error_response.schema.json",
+  "title": "Formato estándar de error de las APIs de LogiTrack",
+  "type": "object",
+  "required": ["error", "requestId"],
+  "properties": {
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z_]+$" },
+        "message": { "type": "string", "minLength": 1 },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field", "issue"],
+            "properties": { "field": { "type": "string" }, "issue": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "requestId": { "type": ["string", "null"] }
+  }
+}

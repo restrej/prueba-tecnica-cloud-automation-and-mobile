@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Landing page del Centro de Control: se muestra después de un login exitoso. -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Centro de Control - Panel</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="card wide">
+    <header class="row">
+      <h1 data-testid="dashboard-title">Panel de pedidos</h1>
+      <button type="button" data-testid="logout-button">Cerrar sesión</button>
+    </header>
+    <!-- El texto de bienvenida lo completa app.js con el nombre del usuario -->
+    <p data-testid="welcome-message"></p>
+    <table data-testid="orders-table">
+      <thead><tr><th>Pedido</th><th>Almacén</th><th>Estado</th><th>Operador</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

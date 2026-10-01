@@ -1,0 +1,31 @@
+# =============================================================================
+# Dependencias del proyecto (versiones fijadas = builds reproducibles).
+# Instalar con:  pip install -r requirements.txt
+# =============================================================================
+
+# --- Sistema bajo prueba simulado (orders-api de LogiTrack) -------------------
+fastapi==0.142.2            # Framework web para construir la API REST simulada
+uvicorn[standard]==0.54.0   # Servidor ASGI que ejecuta la app FastAPI
+pydantic==2.13.5            # Validación de datos de entrada (request bodies)
+
+# --- Núcleo de pruebas --------------------------------------------------------
+pytest==9.1.1               # Runner de pruebas principal
+pytest-html==4.2.0          # Reporte HTML legible por humanos
+pytest-cov==7.1.0           # Medición de cobertura de código (coverage gate)
+pytest-rerunfailures==16.7  # Reintentos controlados para tests flaky
+
+# --- API testing -------------------------------------------------------------
+httpx==0.28.1               # Cliente HTTP moderno (sync/async) para pruebas de API
+jsonschema==4.26.0          # Validación de contratos JSON (respuestas y eventos)
+
+# --- UI web testing -----------------------------------------------------------
+playwright==1.56.0          # Automatización de navegador (Chromium/Firefox/WebKit)
+pytest-playwright==0.9.0    # Integración Playwright <-> pytest (fixtures page, browser)
+
+# --- Mobile testing -----------------------------------------------------------
+Appium-Python-Client==6.0.7 # Cliente Python de Appium (WebDriver para móviles)
+
+# --- Calidad de código y seguridad (SAST / SCA) --------------------------------
+ruff==0.16.9                # Linter + formateador Python
+bandit==1.9.4               # SAST para Python (busca patrones inseguros)
+pip-audit==2.10.1           # SCA: busca CVEs en dependencias

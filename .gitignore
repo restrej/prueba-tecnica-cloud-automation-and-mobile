@@ -1,0 +1,28 @@
+# Entorno virtual de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Caches de herramientas
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# Reportes generados por las ejecuciones (se publican como artefactos en CI)
+reports/
+test-results/
+
+# Flutter / Dart
+mobile-app/.dart_tool/
+mobile-app/build/
+mobile-app/.flutter-plugins
+mobile-app/.flutter-plugins-dependencies
+mobile-app/.metadata
+
+# Sistema operativo / IDE
+.DS_Store
+.idea/
+.vscode/

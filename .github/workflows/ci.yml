@@ -1,0 +1,304 @@
+# =============================================================================
+# PARTE 3 - 3.3: Pipeline CI/CD de calidad de LogiTrack (GitHub Actions).
+#
+# Qué hace (en orden):
+#   1. static-analysis : lint + SAST (Bandit, Semgrep) + SCA (pip-audit)       ~2 min
+#   2. unit-integration: unit + integration + contract con COVERAGE GATE 80%   ~2 min
+#   3. functional-tests: API + seguridad + UI (Playwright) -> reporte HTML/JUnit
+#                        + QUALITY GATE (falla si hay tests CRÍTICOS en rojo) ~4 min
+#   4. performance-smoke: k6 corto con umbrales (p95/p99/errores)              ~2 min
+#   5. dast-zap        : OWASP ZAP ataca la API levantada                      ~5 min
+#   6. quarantine      : tests flaky aislados + reporte (NO bloquea)           ~1 min
+#   7. notify          : resumen + notificación a Slack del resultado final
+#
+# Los reportes quedan como ARTEFACTOS descargables en la página de la ejecución.
+# =============================================================================
+
+name: CI - Quality Pipeline
+
+# --- ¿Cuándo se ejecuta? -------------------------------------------------------
+on:
+  pull_request:                 # en cada Pull Request hacia main
+    branches: [main]
+  push:                         # en cada merge/push a main
+    branches: [main]
+  workflow_dispatch:            # manualmente desde la pestaña "Actions"
+
+# --- Concurrencia: si llega un push nuevo al mismo PR, cancela la ejecución vieja ---
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# --- Permisos mínimos del token de GitHub (principio de mínimo privilegio) ------
+permissions:
+  contents: read
+
+# --- Variables comunes a todos los jobs ----------------------------------------
+env:
+  PYTHON_VERSION: "3.11"
+  # Evita que Python guarde la salida en buffer (logs en tiempo real).
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  # ===========================================================================
+  # 1. ANÁLISIS ESTÁTICO: no ejecuta la app, revisa el CÓDIGO y las DEPENDENCIAS.
+  # ===========================================================================
+  static-analysis:
+    name: Lint + SAST + SCA
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip                      # reutiliza paquetes entre ejecuciones (más rápido)
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt semgrep
+
+      - name: Lint (Ruff)
+        run: ruff check .
+
+      - name: SAST - Bandit (patrones inseguros en Python)
+        run: bandit -r sut framework tools -c pyproject.toml -f txt
+
+      - name: SAST - Semgrep (reglas OWASP Top 10)
+        # --error: termina con código != 0 si encuentra problemas -> bloquea el PR.
+        run: semgrep scan --config p/python --config p/owasp-top-ten --error --metrics=off sut framework
+
+      - name: SCA - pip-audit (CVEs conocidos en dependencias)
+        run: pip-audit -r requirements.txt
+
+  # ===========================================================================
+  # 2. PRUEBAS UNITARIAS, DE INTEGRACIÓN Y DE CONTRATO + COVERAGE GATE
+  # ===========================================================================
+  unit-integration:
+    name: Unit + Integration + Contract (coverage gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Ejecutar pruebas con cobertura
+        # --cov-fail-under=80 -> COVERAGE GATE: si la cobertura < 80% el paso falla.
+        run: >
+          pytest tests/unit tests/integration tests/contract
+          --cov --cov-report=xml:reports/coverage.xml --cov-report=term --cov-fail-under=80
+          --junitxml=reports/junit-unit.xml
+          --html=reports/unit-report.html --self-contained-html
+
+      - name: Publicar reportes como artefacto
+        if: always()                      # se publica aunque las pruebas fallen
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-integration-reports
+          path: reports/
+          retention-days: 14
+
+  # ===========================================================================
+  # 3. PRUEBAS FUNCIONALES (API + SEGURIDAD + UI WEB) + QUALITY GATE
+  # ===========================================================================
+  functional-tests:
+    name: API + Security + UI (Playwright)
+    runs-on: ubuntu-latest
+    needs: unit-integration               # sólo corre si unit/integration pasó (fail fast)
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Instalar navegador Chromium para Playwright
+        run: python -m playwright install --with-deps chromium
+
+      - name: Ejecutar pruebas funcionales
+        id: tests
+        # continue-on-error: dejamos que termine para que el QUALITY GATE decida
+        # (los no críticos pueden fallar dentro del umbral; los críticos bloquean).
+        continue-on-error: true
+        # El servidor bajo prueba lo levanta conftest.py automáticamente.
+        # --reruns 1: un reintento para fallos transitorios (queda registrado en el reporte).
+        run: >
+          pytest -m "(api or security or ui) and not quarantine"
+          --reruns 1 --reruns-delay 1
+          --junitxml=reports/junit-functional.xml
+          --html=reports/functional-report.html --self-contained-html
+          --screenshot only-on-failure --tracing retain-on-failure --output reports/playwright
+
+      - name: Publicar reportes como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-test-reports
+          path: reports/
+          retention-days: 14
+
+      - name: QUALITY GATE - bloquear si hay tests críticos en rojo
+        # Lee el JUnit, escribe un resumen en la página de la ejecución y
+        # devuelve exit code 1 si falló algún test @critical o la tasa de éxito < 95%.
+        run: python tools/quality_gate.py "reports/junit-functional.xml"
+
+  # ===========================================================================
+  # 4. SMOKE DE RENDIMIENTO CON K6 (umbrales de p95/p99/errores)
+  # ===========================================================================
+  performance-smoke:
+    name: Performance smoke (k6)
+    runs-on: ubuntu-latest
+    needs: unit-integration
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Levantar el servicio en segundo plano
+        # Rate limit alto: queremos medir la API, no el limitador.
+        run: |
+          RATE_LIMIT_PER_MINUTE=1000000 nohup uvicorn sut.main:app --port 8000 > reports-sut.log 2>&1 &
+          # Esperamos a que /health responda (máx. 30 s).
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 1; done
+
+      - name: Instalar k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Ejecutar prueba de carga corta
+        # Si algún threshold no se cumple, k6 devuelve exit code 99 -> el job falla.
+        run: |
+          mkdir -p reports/k6
+          k6 run -e QUICK=1 performance/k6/assign_load_test.js
+
+      - name: Publicar reporte de k6
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-report
+          path: reports/k6/
+
+  # ===========================================================================
+  # 5. DAST: OWASP ZAP ataca la API en ejecución
+  # ===========================================================================
+  dast-zap:
+    name: DAST (OWASP ZAP)
+    runs-on: ubuntu-latest
+    needs: unit-integration
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Levantar el servicio
+        run: |
+          RATE_LIMIT_PER_MINUTE=1000000 nohup uvicorn sut.main:app --port 8000 > sut.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 1; done
+
+      - name: Escaneo ZAP (falla si hay vulnerabilidades marcadas como FAIL)
+        run: bash security/zap/run_zap_scan.sh http://localhost:8000
+
+      - name: Publicar reporte ZAP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: reports/security/
+
+  # ===========================================================================
+  # 6. CUARENTENA: tests flaky. Se ejecutan y se reportan, pero NO bloquean.
+  # ===========================================================================
+  quarantine:
+    name: Quarantine (no bloqueante)
+    runs-on: ubuntu-latest
+    needs: unit-integration
+    continue-on-error: true               # su fallo NO marca el workflow en rojo
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Ejecutar 10 veces los tests en cuarentena
+        run: |
+          for i in $(seq 1 10); do
+            pytest -m quarantine -q --junitxml=reports/flaky/run-$i.xml || true
+          done
+
+      - name: Reporte de flakiness (en el resumen de la ejecución)
+        run: python tools/flaky_report.py "reports/flaky/*.xml"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flakiness-report
+          path: reports/flaky/
+
+  # ===========================================================================
+  # 7. NOTIFICACIÓN DEL RESULTADO (Slack)
+  # ===========================================================================
+  notify:
+    name: Notificar resultado
+    runs-on: ubuntu-latest
+    # Espera a todos los jobs bloqueantes y se ejecuta SIEMPRE (pasen o fallen).
+    needs: [static-analysis, unit-integration, functional-tests, performance-smoke, dast-zap]
+    if: always()
+    steps:
+      - name: Calcular estado final
+        id: status
+        run: |
+          # "contains(needs.*.result, 'failure')" es true si algún job falló.
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "emoji=:red_circle:" >> "$GITHUB_OUTPUT"
+            echo "text=FALLÓ" >> "$GITHUB_OUTPUT"
+          else
+            echo "emoji=:large_green_circle:" >> "$GITHUB_OUTPUT"
+            echo "text=EXITOSO" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enviar mensaje a Slack
+        # Sólo si se configuró el secreto SLACK_WEBHOOK_URL (Settings > Secrets > Actions).
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -sf -X POST -H 'Content-Type: application/json' "$SLACK_WEBHOOK_URL" -d @- <<EOF
+          {
+            "text": "${{ steps.status.outputs.emoji }} *LogiTrack CI ${{ steps.status.outputs.text }}*\n• Repo: ${{ github.repository }}\n• Rama: ${{ github.ref_name }}\n• Autor: ${{ github.actor }}\n• Estáticos: ${{ needs.static-analysis.result }} | Unit: ${{ needs.unit-integration.result }} | Funcionales: ${{ needs.functional-tests.result }} | k6: ${{ needs.performance-smoke.result }} | ZAP: ${{ needs.dast-zap.result }}\n• Reportes: $RUN_URL"
+          }
+          EOF
+
+      - name: Resumen en la página de la ejecución
+        run: |
+          {
+            echo "## Resultado del pipeline: ${{ steps.status.outputs.text }}"
+            echo "| Job | Resultado |"
+            echo "|---|---|"
+            echo "| Lint + SAST + SCA | ${{ needs.static-analysis.result }} |"
+            echo "| Unit + Integration + Contract | ${{ needs.unit-integration.result }} |"
+            echo "| API + Security + UI | ${{ needs.functional-tests.result }} |"
+            echo "| Performance (k6) | ${{ needs.performance-smoke.result }} |"
+            echo "| DAST (ZAP) | ${{ needs.dast-zap.result }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fallar si algún job bloqueante falló
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://logitrack.example/contracts/assign_response.schema.json",
+  "title": "Respuesta 201 de POST /api/v1/orders/assign",
+  "description": "Contrato que esperan los consumidores (PickApp y Centro de Control). Si el proveedor (orders-api) lo rompe, la prueba de contrato falla en el PR.",
+  "type": "object",
+  "required": ["assignmentId", "orderId", "operatorId", "status", "timestamp"],
+  "properties": {
+    "assignmentId": { "type": "string", "pattern": "^ASG-\\d+$" },
+    "orderId": { "type": "string", "pattern": "^ORD-\\d{4}-\\d{6}$" },
+    "operatorId": { "type": "string", "pattern": "^OP-\\d{1,6}$" },
+    "status": { "type": "string", "enum": ["ASSIGNED"] },
+    "timestamp": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }
+  },
+  "additionalProperties": true
+}

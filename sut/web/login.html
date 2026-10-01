@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  Pantalla de login del "Centro de Control" (simula la app Angular).
+
+  Notas para automatización:
+  - Cada elemento interactivo tiene un atributo data-testid: es un "contrato" estable
+    entre desarrollo y QA que no cambia aunque cambien estilos, textos o estructura.
+  - Los "id" imitan los IDs autogenerados de Angular Material (mat-input-0, mat-input-1),
+    que cambian según el orden de renderizado: por eso NO conviene usarlos como locator.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Centro de Control - Login</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="card">
+    <h1 data-testid="login-title">Centro de Control - Login</h1>
+
+    <!-- novalidate: desactiva la validación nativa del navegador; la hacemos en app.js -->
+    <form data-testid="login-form" novalidate>
+      <label for="mat-input-0">Usuario:</label>
+      <input id="mat-input-0" name="username" formcontrolname="username" type="text"
+             maxlength="50" autocomplete="username" data-testid="login-username">
+      <small class="field-error" data-testid="username-error" hidden></small>
+
+      <label for="mat-input-1">Contraseña:</label>
+      <input id="mat-input-1" name="password" formcontrolname="password" type="password"
+             maxlength="64" autocomplete="current-password" data-testid="login-password">
+      <small class="field-error" data-testid="password-error" hidden></small>
+
+      <button type="submit" data-testid="login-submit">Entrar</button>
+    </form>
+
+    <!-- role="alert": los lectores de pantalla (y Playwright con getByRole) lo detectan -->
+    <div class="alert" role="alert" data-testid="login-error" hidden></div>
+
+    <a href="/control/forgot-password" data-testid="forgot-password-link">¿Olvidaste tu contraseña?</a>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

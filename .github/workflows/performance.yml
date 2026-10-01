@@ -1,0 +1,66 @@
+# =============================================================================
+# Pipeline de RENDIMIENTO completo (k6): carga, estrés, soak, spike y la prueba
+# del punto 5.2 (50 VUs, 5 min). Se ejecuta bajo demanda o semanalmente,
+# NO en cada PR (es largo y debe correr contra un ambiente tipo producción).
+# =============================================================================
+
+name: Performance - k6
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: "Tipo de prueba"
+        type: choice
+        options: [assign-load-5.2, load, stress, soak, spike]
+        default: assign-load-5.2
+      base_url:
+        description: "URL del ambiente (vacío = servicio local en el runner)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 3 * * 0"             # domingos 03:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300            # el soak dura 4 horas
+    env:
+      TEST_TYPE: ${{ github.event.inputs.test_type || 'assign-load-5.2' }}
+      TARGET_URL: ${{ github.event.inputs.base_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Levantar servicio local (si no se indicó una URL)
+        if: env.TARGET_URL == ''
+        run: |
+          pip install -r requirements.txt
+          RATE_LIMIT_PER_MINUTE=1000000 nohup uvicorn sut.main:app --port 8000 > sut.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 1; done
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Ejecutar k6
+        run: |
+          mkdir -p reports/k6
+          URL="${TARGET_URL:-http://localhost:8000}"
+          if [ "$TEST_TYPE" = "assign-load-5.2" ]; then
+            k6 run -e BASE_URL="$URL" performance/k6/assign_load_test.js
+          else
+            k6 run -e BASE_URL="$URL" -e TEST_TYPE="$TEST_TYPE" \
+              --summary-export=reports/k6/$TEST_TYPE-summary.json performance/k6/performance_plan.js
+          fi
+
+      - name: Publicar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-${{ env.TEST_TYPE }}
+          path: reports/k6/
