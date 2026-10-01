@@ -15,8 +15,20 @@ import os
 # AppiumBy: estrategias de búsqueda propias de Appium (además de las de Selenium).
 from appium.webdriver.common.appiumby import AppiumBy
 
-# Locator del campo de texto que tiene el foco en Android (donde "escribe" el teclado).
-FOCUSED_INPUT_ANDROID = (AppiumBy.ANDROID_UIAUTOMATOR, "new UiSelector().focused(true)")
+# Locator de la CAJA DE TEXTO editable (EditText) que tiene el foco en Android.
+FOCUSED_INPUT_ANDROID = (
+    AppiumBy.ANDROID_UIAUTOMATOR,
+    'new UiSelector().className("android.widget.EditText").focused(true)',
+)
+
+
+def editable_child_android(identifier: str) -> tuple[str, str]:
+    """Caja de texto (EditText) que está DENTRO del elemento con ese identificador de Flutter."""
+    return (
+        AppiumBy.ANDROID_UIAUTOMATOR,
+        f'new UiSelector().resourceId("{identifier}")'
+        '.childSelector(new UiSelector().className("android.widget.EditText"))',
+    )
 
 
 def flutter_id(identifier: str) -> tuple[str, str]:

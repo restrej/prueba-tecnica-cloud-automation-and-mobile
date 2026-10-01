@@ -10,10 +10,11 @@ mensaje claro.
 import os
 
 # WebDriverWait + expected_conditions: esperas explícitas de Selenium (Appium las hereda).
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from framework.mobile.locators import FOCUSED_INPUT_ANDROID, flutter_id
+from framework.mobile.locators import FOCUSED_INPUT_ANDROID, editable_child_android, flutter_id
 
 # Tiempo máximo de espera por elemento (configurable para dispositivos lentos / granjas en la nube).
 DEFAULT_TIMEOUT = int(os.getenv("MOBILE_WAIT_TIMEOUT", "15"))
@@ -51,10 +52,14 @@ class BaseScreen:
         field.click()
         if self.driver.capabilities.get("platformName", "").lower() != "android":
             return field
-        try:
-            return self.wait.until(EC.presence_of_element_located(FOCUSED_INPUT_ANDROID))
-        except Exception:  # noqa: BLE001  si no se encuentra, usamos el mismo elemento
-            return field
+        # 1) La caja de texto que quedó con el foco después del toque.
+        # 2) Si no aparece, la caja de texto que está dentro del contenedor.
+        for locator in (FOCUSED_INPUT_ANDROID, editable_child_android(identifier)):
+            try:
+                return WebDriverWait(self.driver, 5).until(EC.presence_of_element_located(locator))
+            except TimeoutException:  # no apareció: probamos la siguiente opción
+                continue
+        return field
 
     def type_text(self, identifier: str, text: str) -> None:
         """Toca un campo de texto, lo limpia y escribe."""
