@@ -286,34 +286,66 @@ $ bash security/zap/run_zap_scan.sh http://localhost:8000
 
 ## Paso 13. Pruebas MOBILE con Appium (Parte 4, Ejercicio C)
 
-Esta parte necesita un emulador Android, así que tiene más requisitos.
+Appium necesita un Android donde instalar la app. Hay 2 opciones; en ambas **no necesitas instalar Flutter**,
+porque GitHub Actions ya compila la app (el archivo APK).
 
-1. Instala **Android Studio**, crea un emulador (Device Manager → *Create device* → Pixel 6, Android 14) y arráncalo.
-2. Instala **Flutter** (<https://docs.flutter.dev/get-started/install>) y verifica con `flutter doctor`.
-3. Prueba la app sin emulador (pruebas de widgets):
+> **Sobre iOS:** automatizar iPhone exige una Mac con Xcode (es una regla de Apple). Desde Ubuntu solo se puede
+> automatizar Android. Vysor en iOS solo muestra la pantalla; no permite automatizar.
+
+### 13.1 Preparación (una sola vez)
+
+1. **Java y herramientas de Android** (Appium las usa para instalar la app y hablar con el celular):
    ```bash
-   $ cd mobile-app
-   $ flutter pub get
-   $ flutter test
+   $ sudo apt install -y openjdk-17-jdk
+   $ sudo snap install android-studio --classic
    ```
-4. Compila el APK:
+   Abre Android Studio una vez y deja que instale el "Android SDK" (siguiente, siguiente, finalizar).
+   Luego agrega estas líneas al final de `~/.bashrc` y abre una terminal nueva:
    ```bash
-   $ flutter build apk --debug
-   $ cd ..
+   export ANDROID_HOME=$HOME/Android/Sdk
+   export PATH=$PATH:$ANDROID_HOME/platform-tools
+   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
    ```
-5. Instala y arranca **Appium** (requiere Node.js), en otra terminal:
+2. **Node.js y Appium:**
    ```bash
-   $ npm install -g appium
+   $ sudo apt install -y nodejs npm
+   $ sudo npm install -g appium
    $ appium driver install uiautomator2
+   ```
+3. **Descarga la app (APK):** en GitHub → pestaña **Actions** → "Mobile - Appium E2E" → la última ejecución
+   en verde → abajo, en **Artifacts**, descarga `pickapp-apk`. Descomprime el zip; dentro está `app-debug.apk`.
+   Muévelo a la carpeta del proyecto, por ejemplo `~/prueba-tecnica-cloud-automation-and-mobile/app-debug.apk`.
+
+### 13.2 Opción A (recomendada para ti): celular Android real + Vysor
+
+**Vysor no es un emulador:** muestra en tu PC la pantalla de un celular real conectado por USB. Las pruebas corren
+en el celular y tú las ves en Vysor.
+
+1. En el celular: *Ajustes → Acerca del teléfono* → toca 7 veces **Número de compilación** (se activa el modo
+   desarrollador). Luego *Ajustes → Opciones de desarrollador* → activa **Depuración USB**.
+2. Conecta el celular por USB y acepta el mensaje "¿Permitir depuración USB?".
+3. Verifica que el PC lo ve:
+   ```bash
+   $ adb devices
+   ```
+   ✅ Debe aparecer una línea con un código y la palabra `device`.
+4. Abre **Vysor** para ver la pantalla del celular en el PC.
+5. En una terminal, arranca Appium (déjala abierta):
+   ```bash
    $ appium --allow-insecure='*:adb_shell'
    ```
-6. Ejecuta las pruebas (con el entorno virtual activo):
+6. En otra terminal, dentro del proyecto y con el entorno virtual activo:
    ```bash
-   $ pytest tests/mobile -v
+   $ source .venv/bin/activate
+   $ APP_PATH=$PWD/app-debug.apk ANDROID_DEVICE_NAME="Mi celular" pytest tests/mobile -v
    ```
+   ✅ Verás en Vysor cómo la app se instala y se usa sola: login → pedido → escaneo → guía generada.
+   Las capturas de cada paso quedan en `reports/mobile/` (01-login.png ... 05-guia-generada.png).
 
-✅ Verás la app abrirse sola en el emulador: login → pedido → escaneo → guía generada.
-Si Appium no está corriendo, las pruebas aparecen como `SKIPPED` con un mensaje explicando por qué.
+### 13.3 Opción B: emulador de Android Studio
+
+1. En Android Studio: *More Actions → Virtual Device Manager → Create device* → Pixel 6 → Android 14 → arrancarlo.
+2. Sigue los pasos 5 y 6 de la Opción A (con el emulador encendido, `adb devices` lo muestra como `emulator-5554`).
 
 Datos de la app demo: usuario `OP-312`, contraseña `Pick2025!`, códigos de barras
 `7501234567890` y `7501234567891` (pedido ORD-2025-007841).
@@ -333,10 +365,17 @@ Los pipelines están en `.github/workflows/`:
 Para verlos: en GitHub entra a la pestaña **Actions**. Cada ejecución publica los
 reportes en la sección **Artifacts** (abajo en la página de la ejecución).
 
-**Configurar la notificación de Slack (opcional):**
-1. En Slack crea un *Incoming Webhook* (<https://api.slack.com/messaging/webhooks>).
-2. En GitHub: *Settings → Secrets and variables → Actions → New repository secret*,
-   nombre `SLACK_WEBHOOK_URL`, valor = la URL del webhook.
+**Configurar la notificación de Slack:**
+1. En Slack, crea un canal para los avisos, por ejemplo `#qa-logitrack` (botón **+** junto a "Canales").
+2. En el navegador entra a <https://api.slack.com/apps> → **Create New App** → **From scratch** →
+   nombre `LogiTrack CI` → elige tu espacio de trabajo → **Create App**.
+3. En el menú izquierdo: **Incoming Webhooks** → activa el interruptor **On** →
+   abajo **Add New Webhook to Workspace** → elige el canal `#qa-logitrack` → **Permitir**.
+4. Copia la **Webhook URL** (empieza con `https://hooks.slack.com/services/...`). Es secreta: no la publiques.
+5. En GitHub, en tu repositorio: **Settings → Secrets and variables → Actions → New repository secret** →
+   *Name*: `SLACK_WEBHOOK_URL` → *Secret*: pega la URL → **Add secret**.
+6. Prueba: pestaña **Actions** → "Ejemplo 3.3 - Pruebas con reporte y notificación" → **Run workflow** →
+   elige la rama `claude/sweet-gauss-v7c00d` → **Run workflow**. En 1 o 2 minutos llega el mensaje al canal.
 
 **Proteger la rama main (Parte 3.2):** *Settings → Branches → Add branch protection rule* →
 `main` → marcar *Require a pull request before merging*, *Require approvals (1)*,

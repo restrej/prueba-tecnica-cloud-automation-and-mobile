@@ -73,6 +73,15 @@ jobs:
         working-directory: mobile-app
         run: flutter build apk --debug
 
+      # Publica la app compilada para instalarla en un celular real sin necesitar Flutter.
+      # Se publica una sola vez (desde el job del Pixel 6) para no duplicar el artefacto.
+      - name: Publicar el APK de PickApp
+        if: matrix.device.api == 34
+        uses: actions/upload-artifact@v4
+        with:
+          name: pickapp-apk
+          path: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

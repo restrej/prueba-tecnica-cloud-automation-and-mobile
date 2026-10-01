@@ -54,10 +54,12 @@ figcaption { font-size: 8.3pt; color: #55627a; }
 
 def compose_mobile_strip() -> None:
     """
-    Si existen capturas de Appium en docs/img/mobile/ (01-login.png ... 05-guia-generada.png),
+    Si existen capturas de Appium (01-login.png ... 05-guia-generada.png) en docs/img/mobile/ o en docs/img/,
     las une en una sola imagen horizontal docs/img/mobile-flujo.png (requiere Pillow).
     """
-    shots = sorted((ROOT / "docs" / "img" / "mobile").glob("0*.png"))
+    img_dir = ROOT / "docs" / "img"
+    # Se aceptan en docs/img/mobile/ o directamente en docs/img/ (01-login.png ... 05-guia-generada.png).
+    shots = sorted((img_dir / "mobile").glob("0*.png")) or sorted(img_dir.glob("0[1-5]-*.png"))
     if not shots:
         return
     from PIL import Image  # import local: sólo se necesita si hay capturas móviles

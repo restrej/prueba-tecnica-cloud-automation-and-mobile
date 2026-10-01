@@ -214,6 +214,8 @@ queda en rojo. Prueba real: desactivé a propósito el control de concurrencia d
 
 ![Ejecución del pipeline en GitHub Actions](../img/github-actions-pipeline.png)
 
+![Notificación del resultado del pipeline recibida en Slack](../img/slack-notificacion.png)
+
 # Parte 4. Automatización técnica (25 puntos)
 
 ## Ejercicio A: pruebas de API (7 puntos)
@@ -380,6 +382,8 @@ diferentes pantallas.*
   pantalla pequeña y Android 11); en la versión candidata, en celulares reales del almacén. Caso real: en el Nexus 5
   el botón "Rechazar" quedaba debajo del borde de la pantalla (el teclado ocupaba la mitad). Por eso la acción de
   tocar primero oculta el teclado y, si el botón no está a la vista, **desplaza la pantalla** hasta encontrarlo.
+- **Celular real:** las mismas pruebas corren en un Android físico conectado por USB, cambiando solo la configuración.
+  Para ver lo que pasa en el celular desde el PC uso **Vysor**, que muestra su pantalla en el computador.
 
 ### C.3 Código: login y uso de elementos de Flutter (2 puntos)
 
