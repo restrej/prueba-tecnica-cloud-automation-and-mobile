@@ -163,8 +163,14 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Instalar el navegador ${{ matrix.browser }}
-        # "chrome" instala Google Chrome oficial; firefox y webkit los provee Playwright.
-        run: python -m playwright install --with-deps ${{ matrix.browser }}
+        # Firefox y WebKit los descarga Playwright. Google Chrome ya viene instalado en la
+        # máquina de GitHub: se usa ese (reinstalarlo encima a veces falla).
+        run: |
+          if [ "${{ matrix.browser }}" = "chrome" ] && command -v google-chrome; then
+            google-chrome --version
+          else
+            python -m playwright install --with-deps ${{ matrix.browser }}
+          fi
 
       - name: Ejecutar pruebas web en ${{ matrix.browser }}
         continue-on-error: true
