@@ -58,7 +58,7 @@ jobs:
           cache: pip                      # reutiliza paquetes entre ejecuciones (más rápido)
 
       - name: Instalar dependencias
-        run: pip install -r requirements.txt semgrep
+        run: pip install -r requirements.txt
 
       - name: Lint (Ruff)
         run: ruff check .
@@ -67,8 +67,11 @@ jobs:
         run: bandit -r sut framework tools -c pyproject.toml -f txt
 
       - name: SAST - Semgrep (reglas OWASP Top 10)
+        # Se usa la imagen Docker oficial de Semgrep (no requiere instalarlo).
         # --error: termina con código != 0 si encuentra problemas -> bloquea el PR.
-        run: semgrep scan --config p/python --config p/owasp-top-ten --error --metrics=off sut framework
+        run: >
+          docker run --rm -v "${{ github.workspace }}:/src" semgrep/semgrep
+          semgrep scan --config p/python --config p/owasp-top-ten --error --metrics=off sut framework
 
       - name: SCA - pip-audit (CVEs conocidos en dependencias)
         run: pip-audit -r requirements.txt
