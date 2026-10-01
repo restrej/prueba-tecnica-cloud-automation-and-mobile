@@ -106,6 +106,8 @@ jobs:
           ANDROID_DEVICE_NAME: ${{ matrix.device.name }}
           # En CI, si Appium no responde, las pruebas FALLAN (no se saltan en silencio).
           REQUIRE_APPIUM: "1"
+          # El emulador de CI es más lento: damos más tiempo a cada espera.
+          MOBILE_WAIT_TIMEOUT: "40"
         with:
           api-level: ${{ matrix.device.api }}
           profile: ${{ matrix.device.profile }}
@@ -113,7 +115,7 @@ jobs:
           target: google_apis
           disable-animations: true    # menos flakiness
           # El script corre cuando el emulador ya arrancó.
-          script: pytest -m mobile --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
+          script: pytest -m mobile -rA --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
 
       - name: Quality gate mobile
         if: always()

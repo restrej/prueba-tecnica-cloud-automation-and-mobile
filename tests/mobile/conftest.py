@@ -54,6 +54,10 @@ def driver(request):
         evidence_dir = Path("reports/mobile")
         evidence_dir.mkdir(parents=True, exist_ok=True)
         session.save_screenshot(str(evidence_dir / f"{request.node.name}.png"))
+        # Diagnóstico: guardamos (y mostramos en el log) la estructura de la pantalla que ve Appium.
+        source = session.page_source
+        (evidence_dir / f"{request.node.name}.xml").write_text(source, encoding="utf-8")
+        print(f"\n===== Estructura de pantalla al fallar ({request.node.name}) =====\n{source[:6000]}")
     session.quit()
 
 
