@@ -114,8 +114,17 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true    # menos flakiness
-          # El script corre cuando el emulador ya arrancó.
-          script: pytest -m mobile -rA --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
+          # Más memoria para el emulador: con poca memoria aparecen ventanas de "no responde".
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -memory 4096
+          # El script corre cuando el emulador ya arrancó (cada línea es un comando aparte):
+          #  1) oculta las ventanas de error del sistema ("Pixel Launcher isn't responding"),
+          #     que tapaban la app en el Pixel 6 (problema de infraestructura, no de la prueba);
+          #  2) cierra cualquier ventana del sistema abierta;
+          #  3) ejecuta la suite móvil.
+          script: |
+            adb shell settings put global hide_error_dialogs 1
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            pytest -m mobile -rA --junitxml=reports/junit-mobile.xml --html=reports/mobile-report.html --self-contained-html
 
       - name: Quality gate mobile
         if: always()
