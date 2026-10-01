@@ -66,7 +66,7 @@ class OrderDetailScreen(BaseScreen):
 
     def scan(self, barcode: str) -> "OrderDetailScreen":
         """Simula la lectura de un código de barras."""
-        self.scanner.scan(self.element("scan-input"), barcode)
+        self.scanner.scan(self.focus_input("scan-input"), barcode)
         return self
 
     def progress(self) -> str:

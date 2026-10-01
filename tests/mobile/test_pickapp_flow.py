@@ -25,20 +25,26 @@ PASSWORD = "Pick2025!"
 def test_happy_path_preparation_generates_shipping_guide(driver):
     """Happy path completo: login -> preparación -> guía generada."""
     # Login (C.3: acción de login en la app mobile).
-    orders = LoginScreen(driver).login(OPERATOR, PASSWORD)
+    login = LoginScreen(driver)
+    login.save_evidence("01-login")
+    orders = login.login(OPERATOR, PASSWORD)
     assert orders.is_loaded()
+    orders.save_evidence("02-lista-de-pedidos")
     # Seleccionar pedido y ver sus productos.
     detail = orders.open_order("ORD-2025-007841")
     detail.wait_for_progress("0/2")
+    detail.save_evidence("03-detalle-del-pedido")
     # Escanear cada producto (scanner simulado) y verificar el avance.
     detail.scan("7501234567890")
     detail.wait_for_progress("1/2")
     detail.scan("7501234567891")
     detail.wait_for_progress("2/2")
+    detail.save_evidence("04-productos-escaneados")
     # Confirmar y verificar la guía generada.
     result = detail.confirm()
     assert "Guía Generada" in result.status()
     assert "GUIA-2025-007841" in result.guide_number()
+    result.save_evidence("05-guia-generada")
 
 
 def test_store_pickup_ends_ready_for_pickup(driver):

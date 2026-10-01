@@ -153,7 +153,7 @@ Herramientas automáticas que buscan vulnerabilidades. Hay tres familias:
 
 | Tipo | Qué hace | Cuándo | Herramienta en el proyecto |
 |---|---|---|---|
-| **SAST** (Static Application Security Testing) | Lee el **código fuente** sin ejecutarlo, buscando patrones peligrosos (contraseñas en el código, SQL armado con texto...) | En cada PR (rápido) | **Bandit**, **Semgrep**, reglas `S` de Ruff |
+| **SAST** (Static Application Security Testing) | Lee el **código fuente** sin ejecutarlo, buscando patrones peligrosos (contraseñas en el código, SQL armado con texto...) | En cada PR (rápido) | **Bandit** (y reglas `S` de Ruff) |
 | **SCA** (Software Composition Analysis) | Revisa si las **librerías** que usas tienen vulnerabilidades conocidas (CVE) | En cada PR | **pip-audit** |
 | **DAST** (Dynamic Application Security Testing) | **Ataca la aplicación en ejecución** desde afuera, como un hacker | Al desplegar en un ambiente (main/RC) | **OWASP ZAP** |
 

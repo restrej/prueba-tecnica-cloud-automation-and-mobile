@@ -41,17 +41,15 @@ class BarcodeScannerSimulator:
         Realiza una "lectura" del código.
 
         Args:
-            scan_field: elemento del campo de escaneo (ya localizado por el Screen Object).
+            scan_field: campo de escaneo YA ENFOCADO (lo entrega el Screen Object).
             barcode: código EAN/UPC a "leer".
         """
         if self.strategy == "adb":
-            # Damos foco al campo y "tecleamos" a nivel de sistema operativo.
-            scan_field.click()
+            # "Tecleamos" a nivel de sistema operativo, como un scanner real.
             self.driver.execute_script("mobile: shell", {"command": "input", "args": ["text", barcode]})
             self.driver.execute_script("mobile: shell", {"command": "input", "args": ["keyevent", "66"]})
             return
         # Estrategia por defecto: escribir en el campo y presionar ENTER.
-        scan_field.click()
         scan_field.clear()
         scan_field.send_keys(barcode)
         if self.driver.capabilities.get("platformName", "").lower() == "android":

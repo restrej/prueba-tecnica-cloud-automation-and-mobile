@@ -87,7 +87,7 @@ def test_scanner_type_strategy_types_code_and_enter():
     """Estrategia 'type': escribe el código y presiona ENTER (keycode 66)."""
     driver, field = FakeDriver(), FakeElement()
     BarcodeScannerSimulator(driver).scan(field, "7501234567890")
-    assert field.actions == ["click", "clear", "keys:7501234567890"]
+    assert field.actions == ["clear", "keys:7501234567890"]
     assert driver.calls == ["keycode:66"]
 
 

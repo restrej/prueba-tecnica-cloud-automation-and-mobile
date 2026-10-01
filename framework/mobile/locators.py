@@ -15,6 +15,9 @@ import os
 # AppiumBy: estrategias de búsqueda propias de Appium (además de las de Selenium).
 from appium.webdriver.common.appiumby import AppiumBy
 
+# Locator del campo de texto que tiene el foco en Android (donde "escribe" el teclado).
+FOCUSED_INPUT_ANDROID = (AppiumBy.ANDROID_UIAUTOMATOR, "new UiSelector().focused(true)")
+
 
 def flutter_id(identifier: str) -> tuple[str, str]:
     """

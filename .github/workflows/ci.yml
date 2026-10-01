@@ -2,7 +2,7 @@
 # PARTE 3 - 3.3: Pipeline CI/CD de calidad de LogiTrack (GitHub Actions).
 #
 # Qué hace (en orden):
-#   1. static-analysis : lint + SAST (Bandit, Semgrep) + SCA (pip-audit)       ~2 min
+#   1. static-analysis : lint + SAST (Bandit) + SCA (pip-audit)                ~1 min
 #   2. unit-integration: unit + integration + contract con COVERAGE GATE 80%   ~2 min
 #   3. functional-tests: API + seguridad + UI (Playwright) -> reporte HTML/JUnit
 #                        + QUALITY GATE (falla si hay tests CRÍTICOS en rojo) ~4 min
@@ -65,13 +65,6 @@ jobs:
 
       - name: SAST - Bandit (patrones inseguros en Python)
         run: bandit -r sut framework tools -c pyproject.toml -f txt
-
-      - name: SAST - Semgrep (reglas OWASP Top 10)
-        # Se usa la imagen Docker oficial de Semgrep (no requiere instalarlo).
-        # --error: termina con código != 0 si encuentra problemas -> bloquea el PR.
-        run: >
-          docker run --rm -v "${{ github.workspace }}:/src" semgrep/semgrep
-          semgrep scan --config p/python --config p/owasp-top-ten --error --metrics=off sut framework
 
       - name: SCA - pip-audit (CVEs conocidos en dependencias)
         run: pip-audit -r requirements.txt

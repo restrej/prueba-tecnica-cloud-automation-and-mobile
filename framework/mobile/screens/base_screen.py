@@ -13,7 +13,7 @@ import os
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from framework.mobile.locators import flutter_id
+from framework.mobile.locators import FOCUSED_INPUT_ANDROID, flutter_id
 
 # Tiempo máximo de espera por elemento (configurable para dispositivos lentos / granjas en la nube).
 DEFAULT_TIMEOUT = int(os.getenv("MOBILE_WAIT_TIMEOUT", "15"))
@@ -39,12 +39,33 @@ class BaseScreen:
         """Espera a que el elemento sea CLICKEABLE (visible + habilitado) y lo toca."""
         self.wait.until(EC.element_to_be_clickable(flutter_id(identifier))).click()
 
-    def type_text(self, identifier: str, text: str) -> None:
-        """Toca un campo de texto, lo limpia y escribe."""
+    def focus_input(self, identifier: str):
+        """
+        Toca un campo de texto y devuelve el elemento EDITABLE que quedó con el foco.
+
+        En Flutter, el identificador (Semantics) puede quedar en un contenedor y no
+        en la caja de texto real. Por eso, después de tocarlo, buscamos en Android
+        "el elemento que tiene el foco", que siempre es la caja donde se escribe.
+        """
         field = self.element(identifier)
         field.click()
-        field.clear()
-        field.send_keys(text)
+        if self.driver.capabilities.get("platformName", "").lower() != "android":
+            return field
+        try:
+            return self.wait.until(EC.presence_of_element_located(FOCUSED_INPUT_ANDROID))
+        except Exception:  # noqa: BLE001  si no se encuentra, usamos el mismo elemento
+            return field
+
+    def type_text(self, identifier: str, text: str) -> None:
+        """Toca un campo de texto, lo limpia y escribe."""
+        target = self.focus_input(identifier)
+        target.clear()
+        target.send_keys(text)
+
+    def save_evidence(self, name: str) -> None:
+        """Guarda una captura de pantalla en reports/mobile/ (evidencia de la ejecución)."""
+        os.makedirs("reports/mobile", exist_ok=True)
+        self.driver.save_screenshot(f"reports/mobile/{name}.png")
 
     def text_of(self, identifier: str) -> str:
         """Devuelve el texto visible de un elemento."""
