@@ -39,7 +39,11 @@ def driver(request):
     Si la prueba falla, guarda una captura de pantalla en reports/mobile/ como evidencia.
     """
     if not _appium_is_running():
-        pytest.skip(f"Appium no está disponible en {APPIUM_SERVER_URL} (ver docs/PASO_A_PASO.md paso 8)")
+        message = f"Appium no está disponible en {APPIUM_SERVER_URL} (ver docs/PASO_A_PASO.md paso 13)"
+        # En CI (REQUIRE_APPIUM=1) es un error; en una máquina local sin emulador, se salta.
+        if os.getenv("REQUIRE_APPIUM") == "1":
+            pytest.fail(message)
+        pytest.skip(message)
     session = webdriver.Remote(APPIUM_SERVER_URL, options=build_options())
     # Espera implícita en 0: usamos SOLO esperas explícitas (BaseScreen) -> tiempos predecibles.
     session.implicitly_wait(0)

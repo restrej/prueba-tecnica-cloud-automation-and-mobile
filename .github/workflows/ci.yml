@@ -301,6 +301,9 @@ jobs:
     # Espera a todos los jobs bloqueantes y se ejecuta SIEMPRE (pasen o fallen).
     needs: [static-analysis, unit-integration, functional-tests, ui-tests, performance-smoke, dast-zap]
     if: always()
+    env:
+      # Se declara a nivel de job para que el "if" del paso de Slack pueda leerla.
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Calcular estado final
         id: status
@@ -316,8 +319,6 @@ jobs:
 
       - name: Enviar mensaje a Slack
         # Sólo si se configuró el secreto SLACK_WEBHOOK_URL (Settings > Secrets > Actions).
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: env.SLACK_WEBHOOK_URL != ''
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

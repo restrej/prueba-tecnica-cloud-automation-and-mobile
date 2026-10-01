@@ -91,14 +91,21 @@ jobs:
       - name: Iniciar servidor Appium en segundo plano
         # Se inicia ANTES del emulador: el runner del emulador ejecuta cada línea
         # de su "script" en una shell distinta, y un proceso en background podría perderse.
+        # En Appium 3 los permisos especiales se escriben "<driver>:<permiso>" ("*" = cualquier driver).
         run: |
-          nohup appium --log appium.log --allow-insecure=adb_shell > /dev/null 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4723/status && break; sleep 1; done
+          nohup appium --log appium.log --allow-insecure='*:adb_shell' > appium-console.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4723/status; then echo " -> Appium listo"; exit 0; fi
+            sleep 1
+          done
+          echo "Appium no arrancó en 60 s:"; cat appium-console.log; exit 1
 
       - name: Ejecutar suite mobile en el emulador
         uses: reactivecircus/android-emulator-runner@v2
         env:
           ANDROID_DEVICE_NAME: ${{ matrix.device.name }}
+          # En CI, si Appium no responde, las pruebas FALLAN (no se saltan en silencio).
+          REQUIRE_APPIUM: "1"
         with:
           api-level: ${{ matrix.device.api }}
           profile: ${{ matrix.device.profile }}
@@ -120,3 +127,4 @@ jobs:
           path: |
             reports/
             appium.log
+            appium-console.log

@@ -1,0 +1,73 @@
+# =============================================================================
+# PARTE 3.3 - Ejemplo funcional de pipeline (GitHub Actions)
+#
+# Cumple los 5 puntos que pide la prueba:
+#   1. Ejecuta pruebas automatizadas            -> paso "Ejecutar pruebas"
+#   2. Genera un reporte de resultados          -> reporte HTML + XML (JUnit)
+#   3. Publica el reporte como artefacto        -> paso "Publicar reporte"
+#   4. Falla si hay tests críticos en rojo      -> paso "Quality gate"
+#   5. Envía una notificación del resultado     -> paso "Notificar a Slack"
+# =============================================================================
+name: Ejemplo 3.3 - Pruebas con reporte y notificación
+
+# ¿Cuándo se ejecuta? En cada Pull Request a main y también a mano (botón "Run workflow").
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest          # máquina virtual Linux que presta GitHub
+    env:
+      # La URL secreta de Slack se declara aquí (nivel job) para poder usarla en el "if".
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      # Descarga el código del repositorio en la máquina virtual.
+      - uses: actions/checkout@v4
+
+      # Instala Python 3.11.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Instala las librerías del proyecto (pytest, Playwright, etc.).
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # (1) y (2) Ejecuta las pruebas de API y genera los reportes.
+      #   --junitxml -> reporte en XML (lo lee el quality gate)
+      #   --html     -> reporte en HTML (lo lee una persona)
+      # continue-on-error: aunque fallen pruebas, seguimos para publicar el
+      # reporte y dejar que el quality gate decida.
+      - name: Ejecutar pruebas
+        continue-on-error: true
+        run: >
+          pytest -m "api and not quarantine"
+          --junitxml=reports/resultados.xml
+          --html=reports/reporte.html --self-contained-html
+
+      # (3) Publica la carpeta reports/ como "artefacto" descargable en la
+      # página de la ejecución. "if: always()" = se publica aunque algo falle.
+      - name: Publicar reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-de-pruebas
+          path: reports/
+
+      # (4) Quality gate: lee el XML y termina con error (exit 1) si falló
+      # algún test marcado como @critical. Eso pone el pipeline en ROJO.
+      - name: Quality gate (bloquea si hay críticos en rojo)
+        id: gate
+        run: python tools/quality_gate.py reports/resultados.xml
+
+      # (5) Notificación: se ejecuta SIEMPRE y avisa en Slack si pasó o falló.
+      # Requiere el secreto SLACK_WEBHOOK_URL (Settings > Secrets > Actions).
+      - name: Notificar a Slack
+        if: always() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          RESULTADO: ${{ steps.gate.outcome == 'success' && 'EXITOSO ✅' || 'FALLÓ ❌' }}
+        run: |
+          curl -s -X POST -H 'Content-Type: application/json' "$SLACK_WEBHOOK_URL" \
+            -d "{\"text\": \"Pruebas LogiTrack: $RESULTADO\nRama: ${{ github.ref_name }}\nReporte: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"

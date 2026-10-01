@@ -305,7 +305,7 @@ Esta parte necesita un emulador Android, así que tiene más requisitos.
    ```bash
    $ npm install -g appium
    $ appium driver install uiautomator2
-   $ appium --allow-insecure=adb_shell
+   $ appium --allow-insecure='*:adb_shell'
    ```
 6. Ejecuta las pruebas (con el entorno virtual activo):
    ```bash

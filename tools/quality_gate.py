@@ -5,6 +5,7 @@ Uso:
     python tools/quality_gate.py reports/*.xml
 
 Reglas:
+    0. Si no se ejecutó ninguna prueba (todas saltadas) -> bloquea (sin evidencia no hay aprobación).
     1. Si falla CUALQUIER test marcado como ``critical`` -> bloquea (exit code 1).
     2. Si el porcentaje de éxito total es menor a MIN_PASS_RATE -> bloquea.
     3. Los tests en cuarentena se informan pero NO cuentan para el bloqueo.
@@ -77,7 +78,8 @@ def evaluate(results: list[dict]) -> tuple[bool, str]:
     critical_failed = [r for r in failed if r["critical"]]
     pass_rate = (len(passed) / len(executed) * 100) if executed else 100.0
 
-    approved = not critical_failed and pass_rate >= MIN_PASS_RATE
+    # Si no se ejecutó ninguna prueba (todas saltadas o ausentes) NO hay evidencia: se bloquea.
+    approved = bool(executed) and not critical_failed and pass_rate >= MIN_PASS_RATE
     lines = [
         f"## Quality Gate: {'✅ APROBADO' if approved else '❌ BLOQUEADO'}",
         "",
@@ -90,6 +92,8 @@ def evaluate(results: list[dict]) -> tuple[bool, str]:
         f"| Tasa de éxito | {pass_rate:.1f}% (mínimo {MIN_PASS_RATE:.0f}%) |",
         f"| En cuarentena (no bloquean) | {len([r for r in results if r['quarantine']])} |",
     ]
+    if not executed:
+        lines += ["", "### No se ejecutó ninguna prueba: no hay evidencia de calidad"]
     if critical_failed:
         lines += ["", "### Tests críticos en rojo", *[f"- `{r['name']}`" for r in critical_failed]]
     return approved, "\n".join(lines)

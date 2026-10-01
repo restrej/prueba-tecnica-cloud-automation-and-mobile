@@ -11,7 +11,7 @@ Estrategias implementadas:
        Funciona en Android e iOS, sin permisos especiales. (Por defecto)
     2. ``adb``:  inyecta las teclas a nivel de sistema operativo con ``adb shell input``,
        que es exactamente lo que hace un scanner wedge real. Requiere iniciar
-       Appium con ``--allow-insecure=adb_shell`` (sólo Android).
+       Appium con ``--allow-insecure='*:adb_shell'`` (sólo Android, sintaxis de Appium 3).
 
 Lo que NO se puede simular: la óptica real (códigos dañados, reflejos, distancia).
 Eso queda para pruebas manuales en dispositivo físico (ver respuesta 2.2).
