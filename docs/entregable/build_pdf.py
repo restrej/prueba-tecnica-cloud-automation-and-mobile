@@ -42,15 +42,14 @@ DOC_NAME = "Prueba Técnica Senior QA Engineer · LogiTrack · Solución"
 CSS = """
 body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.5; }
 h1 { font-size: 17pt; font-weight: bold; color: #000; border-bottom: 2px solid #000; padding-bottom: 4px;
-     margin-top: 0; page-break-after: avoid; }
+     margin: 26px 0 12px; }
+body > h1:first-child, .junto > h1:first-child { margin-top: 0; }
 h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 22px; padding-bottom: 3px;
      border-bottom: 1px solid #d9dce1; }
 h3 { font-size: 11pt; font-weight: bold; color: #0b2e59; margin-top: 18px; }
-@page { size: Letter; }
-@page horizontal { size: Letter landscape; }
-.horizontal { page: horizontal; }                        /* la matriz 2.1 va en hojas horizontales */
-.parte { break-before: page; }                           /* cada Parte empieza en una página nueva */
 .junto { break-inside: avoid; }          /* el subtítulo no queda solo al final de una página */
+.tabla-entera { break-inside: avoid; }   /* una tabla que cabe en una hoja no se parte */
+thead { display: table-header-group; }   /* si una tabla es más alta que una hoja, repite el encabezado */
 p em:only-child { color: #5f6670; }
 table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 8.4pt; line-height: 1.4; }
 tr { break-inside: avoid; }
@@ -71,14 +70,15 @@ figure img { max-width: 100%; max-height: 95mm; border: 1px solid #d9dce1; borde
 figure img.terminal { max-height: none; border: none; }
 figcaption { font-size: 8.3pt; color: #5f6670; margin-top: 3px; }
 .con-id td:first-child { white-space: nowrap; }
-/* Matriz de casos (2.1): anchos fijos por columna para que el texto no quede apretado. */
+/* Matriz de casos (2.1): 9 columnas en hoja vertical. Anchos fijos y palabras largas con guion
+   de división (Precondi-ciones), para que el texto no se salga de la celda ni quede apretado. */
 .matriz { table-layout: fixed; }
-.matriz th:nth-child(1) { width: 6%; }  .matriz th:nth-child(2) { width: 9%; }
-.matriz th:nth-child(3) { width: 13%; } .matriz th:nth-child(4) { width: 12%; }
-.matriz th:nth-child(5) { width: 17%; } .matriz th:nth-child(6) { width: 16%; }
+.matriz th, .matriz td { padding: 4px 4px; hyphens: manual; }
+.matriz th:nth-child(1) { width: 8%; }  .matriz th:nth-child(2) { width: 11%; }
+.matriz th:nth-child(3) { width: 14%; } .matriz th:nth-child(4) { width: 12%; }
+.matriz th:nth-child(5) { width: 15%; } .matriz th:nth-child(6) { width: 14%; }
 .matriz th:nth-child(7) { width: 8%; }  .matriz th:nth-child(8) { width: 7%; }
-.matriz th:nth-child(9) { width: 12%; }
-.matriz td { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.matriz th:nth-child(9) { width: 11%; }
 .pendiente { border: 2px dashed #d29922; background: #fff8e6; padding: 14px;
              text-align: center; color: #7a5a00; }
 """
@@ -168,6 +168,7 @@ def build_html(mermaid_js: str | None) -> str:
     # La matriz de casos (2.1) usa anchos fijos por columna.
     body = re.sub(r'<table class="con-id">(?=(?:(?!</table>).)*?TC-01)', '<table class="con-id matriz">',
                   body, flags=re.S)
+    body = hyphenate_matrix(body)
     script = ""
     if mermaid_js:
         script = (f"<script>{Path(mermaid_js).read_text(encoding='utf-8')}</script>"
@@ -176,43 +177,85 @@ def build_html(mermaid_js: str | None) -> str:
            f"<body>{body}{script}</body></html>"
 
 
-# Organiza las páginas antes de imprimir:
-#  - cada "Parte" (h1), salvo la primera, empieza en una página nueva;
-#  - cada subtítulo (h2/h3) se agrupa con su "Qué piden" y el primer bloque de contenido si es corto,
-#    para que el subtítulo nunca quede solo al final de una página (sin dejar grandes espacios en blanco).
+# Organiza las páginas antes de imprimir (sin dejar grandes espacios en blanco):
+#  - cada subtítulo (h2/h3) se agrupa con su "Qué piden" y el primer bloque si es corto; si un h2 va
+#    seguido de un h3 (Ejercicio C -> C.1) o un h1 de un h2 (Parte -> 1.1), van juntos;
+#  - cada tabla que cabe en una hoja se mantiene entera (pasa completa a la hoja siguiente si no cabe).
 KEEP_TOGETHER_JS = """
 () => {
-  const h1s = [...document.querySelectorAll('h1')];
-  h1s.forEach((h, i) => { if (i > 0 && !h.textContent.startsWith('Anexo')) h.classList.add('parte'); });
-  // La Parte 2 hasta antes de 2.2 (la matriz de casos, muy ancha) va en hojas horizontales.
-  const start = h1s.find((h) => h.textContent.startsWith('Parte 2'));
-  const end = [...document.querySelectorAll('h2')].find((h) => h.textContent.startsWith('2.2'));
-  if (start && end) {
-    const wide = document.createElement('div');
-    wide.className = 'horizontal';
-    start.before(wide);
-    for (let n = start; n && n !== end;) {
-      const following = n.nextSibling;
-      wide.appendChild(n);
-      n = following;
+  const PAGE_PX = 880;  // alto útil aproximado de una hoja, en píxeles de la ventana
+  const isAsk = (n) => n.tagName === 'P' && n.querySelector('em')
+    && n.textContent.trim().startsWith('Qué piden');
+  document.querySelectorAll('table').forEach((table) => {
+    if (table.offsetHeight < PAGE_PX) {
+      const wrap = document.createElement('div');
+      wrap.className = 'tabla-entera';
+      table.before(wrap);
+      wrap.appendChild(table);
     }
-  }
+  });
   document.querySelectorAll('h2, h3').forEach((h) => {
+    if (h.parentNode.classList.contains('junto')) return;  // ya quedó agrupado con su título superior
     const box = document.createElement('div');
     box.className = 'junto';
-    h.parentNode.insertBefore(box, h);
+    h.before(box);
+    const previous = box.previousElementSibling;
+    if (previous && previous.tagName === 'H1') box.appendChild(previous);
     box.appendChild(h);
     let next = box.nextElementSibling;
-    const isAsk = (n) => n.tagName === 'P' && n.querySelector('em')
-      && n.textContent.trim().startsWith('Qué piden');
-    while (next && isAsk(next)) {
-      box.appendChild(next); next = box.nextElementSibling;
+    if (h.tagName === 'H2' && next && next.tagName === 'H3') {
+      box.appendChild(next);
+      next = box.nextElementSibling;
     }
-    const short = next && (next.offsetHeight < 160 || next.tagName === 'BLOCKQUOTE');
+    while (next && isAsk(next)) { box.appendChild(next); next = box.nextElementSibling; }
+    const short = next && (next.offsetHeight < 160 || next.tagName === 'BLOCKQUOTE'
+      || next.classList.contains('tabla-entera'));
     if (short && !/^H[1-3]$/.test(next.tagName)) box.appendChild(next);
   });
 }
 """
+
+
+SOFT = "\u00ad"
+# Grupos de consonantes que en español no se separan al dividir una palabra (bra-zo, pla-to, ca-rro).
+INSEPARABLE = {"bl", "br", "cl", "cr", "dr", "fl", "fr", "gl", "gr", "pl", "pr", "tr", "ch", "ll", "rr"}
+VOWELS = set("aeiouáéíóúü")
+
+
+def hyphenate(word: str) -> str:
+    """Agrega guiones de división (invisibles salvo al cortar) a una palabra larga, según el español."""
+    if len(word) < 8 or not word.isalpha():
+        return word
+    low, cuts = word.lower(), []
+    i = 1
+    while i < len(low) - 2:
+        if low[i] in VOWELS and low[i + 1] not in VOWELS:
+            j = i + 1
+            while j < len(low) and low[j] not in VOWELS:
+                j += 1
+            consonants = low[i + 1:j]
+            if j < len(low) and 3 <= i + 1 <= len(low) - 3:
+                if len(consonants) == 1 or consonants[-2:] in INSEPARABLE:
+                    cut = i + 1 if len(consonants) == 1 else j - 2
+                else:
+                    cut = j - 1
+                if 2 <= cut <= len(low) - 3:
+                    cuts.append(cut)
+            i = j
+        else:
+            i += 1
+    for cut in reversed(cuts):
+        word = word[:cut] + SOFT + word[cut:]
+    return word
+
+
+def hyphenate_matrix(body: str) -> str:
+    """Aplica la división de palabras solo al texto (no a las etiquetas) de la tabla de la matriz 2.1."""
+    def fix_table(match: re.Match) -> str:
+        return re.sub(r">([^<]+)<", lambda m: ">" + re.sub(r"[^\W\d_]+", lambda w: hyphenate(w.group(0)),
+                                                             m.group(1)) + "<", match.group(0))
+    return re.sub(r'<table class="con-id matriz">.*?</table>', fix_table, body, flags=re.S)
+
 
 # Márgenes amplios: el texto respira más.
 MARGIN = {"top": "22mm", "bottom": "20mm", "left": "20mm", "right": "20mm"}
@@ -258,7 +301,7 @@ def main() -> None:
             )
         page.evaluate(KEEP_TOGETHER_JS)
         page.pdf(path=str(body_pdf), format="Letter", print_background=True, display_header_footer=True,
-                 prefer_css_page_size=True, header_template=HEADER, footer_template=FOOTER, margin=MARGIN)
+                 header_template=HEADER, footer_template=FOOTER, margin=MARGIN)
         browser.close()
     # Une portada + contenido (pdfunite viene con poppler-utils).
     # Las rutas son archivos que este mismo script acaba de crear (no hay datos externos).
