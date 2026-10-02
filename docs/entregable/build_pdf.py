@@ -29,8 +29,10 @@ CSS = """
 body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.45; }
 h1 { font-size: 17pt; font-weight: bold; color: #000; border-bottom: 2px solid #000; padding-bottom: 4px;
      margin-top: 26px; page-break-after: avoid; }
-h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 18px; border-bottom: 1px solid #c9d4e3; }
-h3 { font-size: 11pt; font-weight: bold; color: #0b2e59; }
+h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 30px; padding-bottom: 3px; border-bottom: 1px solid #c9d4e3; }
+h3 { font-size: 11pt; font-weight: bold; color: #0b2e59; margin-top: 24px; }
+.parte { break-before: page; margin-top: 0; }            /* cada Parte empieza en una página nueva */
+.junto { break-inside: avoid; }                          /* el subtítulo no queda solo al final de una página */
 p em:only-child { color: #55627a; }
 table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 8.4pt; }
 tr { page-break-inside: avoid; }
@@ -48,7 +50,6 @@ figure { margin: 8px 0 12px; text-align: center; page-break-inside: avoid; }
 figure img { max-width: 100%; max-height: 85mm; border: 1px solid #c9d4e3; border-radius: 4px; }
 figcaption { font-size: 8.3pt; color: #55627a; }
 .con-id td:first-child { white-space: nowrap; }
-.matriz { font-size: 7.6pt; }
 .pendiente { border: 2px dashed #d29922; background: #fff8e6; padding: 14px;
              text-align: center; color: #7a5a00; }
 """
@@ -109,14 +110,34 @@ def build_html(mermaid_js: str | None) -> str:
     body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
     # Tablas cuya primera columna es "ID": el ID no se parte en dos líneas.
     body = body.replace("<table>\n<thead>\n<tr>\n<th>ID</th>", '<table class="con-id">\n<thead>\n<tr>\n<th>ID</th>')
-    # La matriz de casos (2.1) tiene 9 columnas: letra un poco más pequeña para que quepa.
-    body = re.sub(r'<table class="con-id">(?=(?:(?!</table>).)*?TC-01)', '<table class="con-id matriz">', body, flags=re.S)
     script = ""
     if mermaid_js:
         script = (f"<script>{Path(mermaid_js).read_text(encoding='utf-8')}</script>"
                   "<script>mermaid.initialize({startOnLoad: true, theme: 'default'});</script>")
     return f"<!doctype html><html lang='es'><head><meta charset='utf-8'><style>{CSS}</style></head>" \
            f"<body>{body}{script}</body></html>"
+
+
+# Organiza las páginas antes de imprimir:
+#  - cada "Parte" (h1), salvo el título del documento, empieza en una página nueva;
+#  - cada subtítulo (h2/h3) se agrupa con su "Qué piden" y el primer bloque de contenido
+#    (si no es muy alto), para que el subtítulo nunca quede solo al final de una página.
+KEEP_TOGETHER_JS = """
+() => {
+  document.querySelectorAll('h1').forEach((h, i) => { if (i > 1) h.classList.add('parte'); });
+  document.querySelectorAll('h2, h3').forEach((h) => {
+    const box = document.createElement('div');
+    box.className = 'junto';
+    h.parentNode.insertBefore(box, h);
+    box.appendChild(h);
+    let next = box.nextElementSibling;
+    while (next && next.tagName === 'P' && next.querySelector('em') && next.textContent.trim().startsWith('Qué piden')) {
+      box.appendChild(next); next = box.nextElementSibling;
+    }
+    if (next && !/^H[1-3]$/.test(next.tagName) && next.offsetHeight < 350) box.appendChild(next);
+  });
+}
+"""
 
 
 def main() -> None:
@@ -137,6 +158,7 @@ def main() -> None:
             page.wait_for_function(
                 "[...document.querySelectorAll('.mermaid')].every(d => d.querySelector('svg'))", timeout=30000
             )
+        page.evaluate(KEEP_TOGETHER_JS)
         page.pdf(
             path=str(OUTPUT), format="Letter", print_background=True, display_header_footer=True,
             header_template="<div></div>",
