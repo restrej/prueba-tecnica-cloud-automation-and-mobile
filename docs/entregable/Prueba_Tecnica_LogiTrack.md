@@ -1,5 +1,3 @@
-# Prueba Técnica: Senior QA Engineer (LogiTrack)
-
 **Cómo leer este documento.** Cada punto empieza con *"Qué piden"* (resumen del enunciado) y luego la respuesta.
 Todo el código mostrado se ejecutó de verdad y las capturas son de esas ejecuciones. Como LogiTrack es una empresa
 ficticia, construí una **versión simulada pequeña de su API y de su pantalla de login**, solo para que las pruebas

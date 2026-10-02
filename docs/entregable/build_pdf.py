@@ -6,6 +6,7 @@ Pasos: Markdown -> HTML (con imágenes y diagramas) -> PDF (con el navegador de 
 Uso, desde la raíz del repositorio y con el entorno virtual activo:
     pip install markdown
     npm install mermaid@11          # dibuja los diagramas (opcional)
+    sudo apt install poppler-utils  # pdfunite: une la portada con el contenido
     python docs/entregable/build_pdf.py --mermaid node_modules/mermaid/dist/mermaid.min.js
 """
 
@@ -13,6 +14,7 @@ import argparse
 import base64
 import html
 import re
+import subprocess
 from pathlib import Path
 
 import markdown
@@ -24,34 +26,74 @@ ROOT = HERE.parents[1]
 SOURCE = HERE / "Prueba_Tecnica_LogiTrack.md"
 OUTPUT = HERE / "Prueba_Tecnica_LogiTrack.pdf"
 
-# Estilos: letra legible, tablas compactas, código con fondo oscuro.
+# Datos de la portada.
+COVER = {
+    "titulo": "Prueba Técnica",
+    "cargo": "Senior QA Engineer — Cloud, Automation &amp; Mobile",
+    "subtitulo": "Solución",
+    "empresa": "LogiTrack",
+    "autor": "Juan Carlos Restrepo",
+    "fecha": "Octubre de 2026",
+}
+DOC_NAME = "Prueba Técnica Senior QA Engineer · LogiTrack · Solución"
+
+# Paleta única: negro (títulos), azul oscuro (subtítulos y encabezados de tabla),
+# grises (textos de apoyo y bordes).
 CSS = """
-body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.45; }
+body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.5; }
 h1 { font-size: 17pt; font-weight: bold; color: #000; border-bottom: 2px solid #000; padding-bottom: 4px;
-     margin-top: 26px; page-break-after: avoid; }
-h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 30px; padding-bottom: 3px; border-bottom: 1px solid #c9d4e3; }
-h3 { font-size: 11pt; font-weight: bold; color: #0b2e59; margin-top: 24px; }
-.parte { break-before: page; margin-top: 0; }            /* cada Parte empieza en una página nueva */
-.junto { break-inside: avoid; }                          /* el subtítulo no queda solo al final de una página */
-p em:only-child { color: #55627a; }
-table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 8.4pt; }
-tr { page-break-inside: avoid; }
-th { background: #14365d; color: #fff; text-align: left; padding: 4px 5px; }
-td { border: 1px solid #d0d7e2; padding: 3px 5px; vertical-align: top; }
-tr:nth-child(even) td { background: #f5f8fc; }
-code { font-family: 'DejaVu Sans Mono', monospace; font-size: 8.3pt; background: #eef2f7; padding: 0 2px; }
-pre { background: #0f1b2d; color: #e6edf3; padding: 8px 10px; border-radius: 5px; font-size: 7.9pt;
-      white-space: pre-wrap; word-break: break-word; }
-pre code { background: none; color: inherit; padding: 0; }
-blockquote { border-left: 4px solid #1f6feb; margin: 8px 0; padding: 4px 12px; background: #f0f6ff; }
-.mermaid { text-align: center; margin: 8px 0; page-break-inside: avoid; }
+     margin-top: 0; page-break-after: avoid; }
+h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 22px; padding-bottom: 3px;
+     border-bottom: 1px solid #d9dce1; }
+h3 { font-size: 11pt; font-weight: bold; color: #0b2e59; margin-top: 18px; }
+@page { size: Letter; }
+@page horizontal { size: Letter landscape; }
+.horizontal { page: horizontal; }                        /* la matriz 2.1 va en hojas horizontales */
+.parte { break-before: page; }                           /* cada Parte empieza en una página nueva */
+.junto { break-inside: avoid; }          /* el subtítulo no queda solo al final de una página */
+p em:only-child { color: #5f6670; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 8.4pt; line-height: 1.4; }
+tr { break-inside: avoid; }
+th { background: #0b2e59; color: #fff; text-align: left; padding: 5px 6px; border: 1px solid #0b2e59; }
+td { border: 1px solid #d9dce1; padding: 4px 6px; vertical-align: top; }
+tr:nth-child(even) td { background: #f6f7f9; }
+code { font-family: 'DejaVu Sans Mono', monospace; font-size: 8.3pt; background: #f1f3f5; padding: 0 2px; }
+pre { background: #0f1b2d; color: #e6edf3; padding: 8px 10px; border-radius: 5px; font-size: 7.3pt;
+      white-space: pre-wrap; word-break: break-word; break-inside: avoid; }
+pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+blockquote { border-left: 3px solid #0b2e59; margin: 8px 0; padding: 4px 12px; background: #f6f7f9;
+             break-inside: avoid; }
+a { color: #0b2e59; }
+.mermaid { text-align: center; margin: 8px 0; break-inside: avoid; }
 .mermaid svg { max-width: 100%; max-height: 100mm; height: auto; }
-figure { margin: 8px 0 12px; text-align: center; page-break-inside: avoid; }
-figure img { max-width: 100%; max-height: 85mm; border: 1px solid #c9d4e3; border-radius: 4px; }
-figcaption { font-size: 8.3pt; color: #55627a; }
+figure { margin: 10px 0 14px; text-align: center; break-inside: avoid; }
+figure img { max-width: 100%; max-height: 95mm; border: 1px solid #d9dce1; border-radius: 4px; }
+figure img.terminal { max-height: none; border: none; }
+figcaption { font-size: 8.3pt; color: #5f6670; margin-top: 3px; }
 .con-id td:first-child { white-space: nowrap; }
+/* Matriz de casos (2.1): anchos fijos por columna para que el texto no quede apretado. */
+.matriz { table-layout: fixed; }
+.matriz th:nth-child(1) { width: 6%; }  .matriz th:nth-child(2) { width: 9%; }
+.matriz th:nth-child(3) { width: 13%; } .matriz th:nth-child(4) { width: 12%; }
+.matriz th:nth-child(5) { width: 17%; } .matriz th:nth-child(6) { width: 16%; }
+.matriz th:nth-child(7) { width: 8%; }  .matriz th:nth-child(8) { width: 7%; }
+.matriz th:nth-child(9) { width: 12%; }
+.matriz td { overflow-wrap: normal; word-break: normal; hyphens: manual; }
 .pendiente { border: 2px dashed #d29922; background: #fff8e6; padding: 14px;
              text-align: center; color: #7a5a00; }
+"""
+
+COVER_CSS = """
+body { font-family: 'DejaVu Sans', Arial, sans-serif; margin: 0; color: #1d2433; }
+.portada { height: 225mm; display: flex; flex-direction: column; justify-content: center;
+           text-align: center; }
+.portada .titulo { font-size: 30pt; font-weight: bold; color: #000; }
+.portada .cargo { font-size: 14pt; color: #0b2e59; font-weight: bold; margin-top: 8px; }
+.portada .linea { width: 70mm; border-top: 2px solid #000; margin: 26px auto; }
+.portada .subtitulo { font-size: 20pt; font-weight: bold; color: #0b2e59; }
+.portada .empresa { font-size: 12pt; color: #5f6670; margin-top: 6px; }
+.portada .autor { font-size: 13pt; font-weight: bold; margin-top: 60mm; }
+.portada .fecha { font-size: 11pt; color: #5f6670; margin-top: 6px; }
 """
 
 
@@ -87,16 +129,28 @@ def insert_files(text: str) -> str:
     return re.sub(r"\{\{archivo:(.+?)\}\}", replace, text)
 
 
+FIGURE_COUNTER = {"n": 0}
+
+
 def image_html(match: re.Match) -> str:
-    """Convierte ![texto](ruta) en una figura con la imagen incrustada (o un aviso si falta)."""
+    """Convierte ![texto](ruta) en una figura numerada con la imagen incrustada (o un aviso si falta)."""
     caption, relative = match.group(1), match.group(2)
     path = (SOURCE.parent / relative).resolve()
     if not path.exists():
         return (f'\n<div class="pendiente">Captura pendiente: <b>{html.escape(caption)}</b><br>'
                 f"(agregar <code>{html.escape(path.name)}</code> en <code>docs/img/</code>)</div>\n")
+    FIGURE_COUNTER["n"] += 1
     data = base64.b64encode(path.read_bytes()).decode("ascii")
-    return (f'\n<figure><img src="data:image/png;base64,{data}">'
-            f"<figcaption>{html.escape(caption)}</figcaption></figure>\n")
+    attrs = ""
+    if path.name.startswith("term-"):
+        # Capturas de terminal (dibujadas al doble de resolución): ancho fijo para que la letra
+        # quede de unos 7 puntos en el papel, legible sin hacer zoom.
+        from PIL import Image  # import local: sólo para medir la imagen
+        width_mm = min(Image.open(path).width / 2 * 0.176, 172)
+        attrs = f' class="terminal" style="width:{width_mm:.0f}mm"'
+    number = FIGURE_COUNTER["n"]
+    return (f'\n<figure><img{attrs} src="data:image/png;base64,{data}">'
+            f"<figcaption><b>Figura {number}.</b> {html.escape(caption)}</figcaption></figure>\n")
 
 
 def build_html(mermaid_js: str | None) -> str:
@@ -109,7 +163,11 @@ def build_html(mermaid_js: str | None) -> str:
     text = re.sub(r"(?m)^!\[(.*?)\]\((.*?)\)\s*$", image_html, text)
     body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
     # Tablas cuya primera columna es "ID": el ID no se parte en dos líneas.
-    body = body.replace("<table>\n<thead>\n<tr>\n<th>ID</th>", '<table class="con-id">\n<thead>\n<tr>\n<th>ID</th>')
+    id_header = "<table>\n<thead>\n<tr>\n<th>ID</th>"
+    body = body.replace(id_header, id_header.replace("<table>", '<table class="con-id">'))
+    # La matriz de casos (2.1) usa anchos fijos por columna.
+    body = re.sub(r'<table class="con-id">(?=(?:(?!</table>).)*?TC-01)', '<table class="con-id matriz">',
+                  body, flags=re.S)
     script = ""
     if mermaid_js:
         script = (f"<script>{Path(mermaid_js).read_text(encoding='utf-8')}</script>"
@@ -119,29 +177,64 @@ def build_html(mermaid_js: str | None) -> str:
 
 
 # Organiza las páginas antes de imprimir:
-#  - cada "Parte" (h1), salvo el título del documento, empieza en una página nueva;
-#  - cada subtítulo (h2/h3) se agrupa con su "Qué piden" y el primer bloque de contenido
-#    (si no es muy alto), para que el subtítulo nunca quede solo al final de una página.
+#  - cada "Parte" (h1), salvo la primera, empieza en una página nueva;
+#  - cada subtítulo (h2/h3) se agrupa con su "Qué piden" y el primer bloque de contenido si es corto,
+#    para que el subtítulo nunca quede solo al final de una página (sin dejar grandes espacios en blanco).
 KEEP_TOGETHER_JS = """
 () => {
-  document.querySelectorAll('h1').forEach((h, i) => { if (i > 1) h.classList.add('parte'); });
+  const h1s = [...document.querySelectorAll('h1')];
+  h1s.forEach((h, i) => { if (i > 0 && !h.textContent.startsWith('Anexo')) h.classList.add('parte'); });
+  // La Parte 2 hasta antes de 2.2 (la matriz de casos, muy ancha) va en hojas horizontales.
+  const start = h1s.find((h) => h.textContent.startsWith('Parte 2'));
+  const end = [...document.querySelectorAll('h2')].find((h) => h.textContent.startsWith('2.2'));
+  if (start && end) {
+    const wide = document.createElement('div');
+    wide.className = 'horizontal';
+    start.before(wide);
+    for (let n = start; n && n !== end;) {
+      const following = n.nextSibling;
+      wide.appendChild(n);
+      n = following;
+    }
+  }
   document.querySelectorAll('h2, h3').forEach((h) => {
     const box = document.createElement('div');
     box.className = 'junto';
     h.parentNode.insertBefore(box, h);
     box.appendChild(h);
     let next = box.nextElementSibling;
-    while (next && next.tagName === 'P' && next.querySelector('em') && next.textContent.trim().startsWith('Qué piden')) {
+    const isAsk = (n) => n.tagName === 'P' && n.querySelector('em')
+      && n.textContent.trim().startsWith('Qué piden');
+    while (next && isAsk(next)) {
       box.appendChild(next); next = box.nextElementSibling;
     }
-    if (next && !/^H[1-3]$/.test(next.tagName) && next.offsetHeight < 350) box.appendChild(next);
+    const short = next && (next.offsetHeight < 160 || next.tagName === 'BLOCKQUOTE');
+    if (short && !/^H[1-3]$/.test(next.tagName)) box.appendChild(next);
   });
 }
 """
 
+# Márgenes amplios: el texto respira más.
+MARGIN = {"top": "22mm", "bottom": "20mm", "left": "20mm", "right": "20mm"}
+HEADER = ("<div style='font-size:7pt;width:100%;margin:0 20mm;padding-bottom:3px;color:#8a9099;"
+          f"border-bottom:0.5px solid #d9dce1;text-align:right'>{DOC_NAME}</div>")
+FOOTER = ("<div style='font-size:7pt;width:100%;text-align:center;color:#8a9099'>"
+          "Página <span class='pageNumber'></span> de <span class='totalPages'></span></div>")
+
+
+def cover_html() -> str:
+    """Portada sencilla: título, cargo, "Solución", autor y fecha, centrados."""
+    c = COVER
+    return (f"<!doctype html><html lang='es'><head><meta charset='utf-8'><style>{COVER_CSS}</style>"
+            f"</head><body><div class='portada'><div class='titulo'>{c['titulo']}</div>"
+            f"<div class='cargo'>{c['cargo']}</div>"
+            f"<div class='linea'></div><div class='subtitulo'>{c['subtitulo']}</div>"
+            f"<div class='empresa'>{c['empresa']}</div><div class='autor'>{c['autor']}</div>"
+            f"<div class='fecha'>{c['fecha']}</div></div></body></html>")
+
 
 def main() -> None:
-    """Genera el HTML, lo abre en el navegador y lo guarda como PDF."""
+    """Genera la portada y el contenido como PDF y los une (la portada no lleva encabezado ni número)."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mermaid", help="Ruta a mermaid.min.js para dibujar los diagramas")
     args = parser.parse_args()
@@ -149,9 +242,14 @@ def main() -> None:
     compose_mobile_strip()
     html_path = OUTPUT.with_suffix(".html")
     html_path.write_text(build_html(args.mermaid), encoding="utf-8")
+    cover_pdf, body_pdf = OUTPUT.with_name("_portada.pdf"), OUTPUT.with_name("_contenido.pdf")
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
+        # Ancho de la ventana = ancho útil de la hoja (Carta menos márgenes),
+        # para medir los bloques como en el papel.
+        page = browser.new_page(viewport={"width": 665, "height": 900})
+        page.set_content(cover_html())
+        page.pdf(path=str(cover_pdf), format="Letter", print_background=True, margin=MARGIN)
         page.goto(html_path.as_uri())
         if args.mermaid:
             # Esperamos a que todos los diagramas estén dibujados.
@@ -159,16 +257,14 @@ def main() -> None:
                 "[...document.querySelectorAll('.mermaid')].every(d => d.querySelector('svg'))", timeout=30000
             )
         page.evaluate(KEEP_TOGETHER_JS)
-        page.pdf(
-            path=str(OUTPUT), format="Letter", print_background=True, display_header_footer=True,
-            header_template="<div></div>",
-            footer_template=("<div style='font-size:7pt;width:100%;text-align:center;color:#7a869a'>"
-                             "Prueba Técnica Senior QA · LogiTrack · <span class='pageNumber'></span>"
-                             " / <span class='totalPages'></span></div>"),
-            margin={"top": "14mm", "bottom": "16mm", "left": "14mm", "right": "14mm"},
-        )
+        page.pdf(path=str(body_pdf), format="Letter", print_background=True, display_header_footer=True,
+                 prefer_css_page_size=True, header_template=HEADER, footer_template=FOOTER, margin=MARGIN)
         browser.close()
-    html_path.unlink()
+    # Une portada + contenido (pdfunite viene con poppler-utils).
+    # Las rutas son archivos que este mismo script acaba de crear (no hay datos externos).
+    subprocess.run(["pdfunite", str(cover_pdf), str(body_pdf), str(OUTPUT)], check=True)  # noqa: S603, S607
+    for temp in (html_path, cover_pdf, body_pdf):
+        temp.unlink()
     print(f"PDF generado: {OUTPUT}")
 
 
