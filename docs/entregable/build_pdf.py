@@ -26,11 +26,11 @@ OUTPUT = HERE / "Prueba_Tecnica_LogiTrack.pdf"
 
 # Estilos: letra legible, tablas compactas, código con fondo oscuro.
 CSS = """
-body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.45; }
-h1 { font-size: 17pt; color: #14365d; border-bottom: 3px solid #1f6feb; padding-bottom: 4px;
+body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.45; }
+h1 { font-size: 17pt; font-weight: bold; color: #000; border-bottom: 2px solid #000; padding-bottom: 4px;
      margin-top: 26px; page-break-after: avoid; }
-h2 { font-size: 12.5pt; color: #14365d; margin-top: 18px; border-bottom: 1px solid #c9d4e3; }
-h3 { font-size: 11pt; color: #1f3a5f; }
+h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 18px; border-bottom: 1px solid #c9d4e3; }
+h3 { font-size: 11pt; font-weight: bold; color: #0b2e59; }
 p em:only-child { color: #55627a; }
 table { border-collapse: collapse; width: 100%; margin: 6px 0 12px; font-size: 8.4pt; }
 tr { page-break-inside: avoid; }
@@ -108,7 +108,7 @@ def build_html(mermaid_js: str | None) -> str:
     script = ""
     if mermaid_js:
         script = (f"<script>{Path(mermaid_js).read_text(encoding='utf-8')}</script>"
-                  "<script>mermaid.initialize({startOnLoad: true, theme: 'default'});</script>")
+                  "<script>mermaid.initialize({startOnLoad: true, theme: 'default', themeVariables: {fontFamily: 'Arial, Liberation Sans, sans-serif'}});</script>")
     return f"<!doctype html><html lang='es'><head><meta charset='utf-8'><style>{CSS}</style></head>" \
            f"<body>{body}{script}</body></html>"
 

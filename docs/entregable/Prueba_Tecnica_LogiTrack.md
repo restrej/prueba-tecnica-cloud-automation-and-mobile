@@ -1,11 +1,9 @@
 # Prueba Técnica: Senior QA Engineer (LogiTrack)
 
-**Candidato:** restrej · **Repositorio con todo el código:** github.com/restrej/prueba-tecnica-cloud-automation-and-mobile
-
 **Cómo leer este documento.** Cada punto empieza con *"Qué piden"* (resumen del enunciado) y luego la respuesta.
-Todo el código mostrado existe en el repositorio y se ejecutó de verdad; las capturas son de esas ejecuciones.
-Como LogiTrack no existe, el repositorio incluye una **versión simulada pequeña de su API y de su pantalla de login**
-(carpeta `sut/`), solo para que las pruebas tengan algo real contra qué ejecutarse.
+Todo el código mostrado se ejecutó de verdad y las capturas son de esas ejecuciones. Como LogiTrack es una empresa
+ficticia, construí una **versión simulada pequeña de su API y de su pantalla de login**, solo para que las pruebas
+tuvieran algo real contra qué ejecutarse.
 
 # Parte 1. Estrategia de calidad y factibilidad de automatización (20 puntos)
 
@@ -20,7 +18,7 @@ minutos, y el mismo error encontrado en el almacén cuesta pedidos perdidos.
 
 ```mermaid
 flowchart LR
-    N["Unitarias<br/>muchas, segundos"] --> I["Integración"] --> C["Contrato"] --> E["End-to-End<br/>pocas, minutos"] --> U["UAT<br/>manual, días"]
+    N["Unitarias<br/>muchas pruebas, segundos"] --> I["Integración"] --> C["Contrato"] --> E["End-to-End<br/>pocas pruebas, minutos"] --> U["UAT<br/>manual, días"]
 ```
 
 | Nivel de prueba | Qué valida | Herramientas | Riesgos que cubre |
@@ -38,7 +36,7 @@ flowchart LR
 | **Pull Request** (alguien propone un cambio) | Revisión de estilo, análisis de seguridad del código, unitarias, contrato | menos de 10 min | Ocurre muchas veces al día; debe ser rápido y barato |
 | **Merge a main** (el cambio fue aprobado) | Lo anterior + integración, API, seguridad, pruebas web, prueba corta de rendimiento | menos de 25 min | Se verifica todo junto una vez por cambio; necesita un ambiente de pruebas |
 | **Release Candidate** (versión candidata a salir) | Regresión completa web y móvil en varios celulares, rendimiento completo, seguridad completa, UAT | 2 a 4 horas + 1 o 2 días de UAT | Es la última barrera antes del cliente; lo más caro se hace aquí, una vez por versión |
-| **Producción** | Pruebas rápidas de humo ("¿está vivo?"), salida gradual a pocos usuarios, monitoreo automático | 5 a 15 min | Detecta lo que solo pasa con datos y tráfico reales |
+| **Producción** | Pruebas de humo (verifican en pocos minutos que lo esencial funciona: login, consultar y asignar un pedido), salida gradual a pocos usuarios, monitoreo automático | 5 a 15 min | Detecta lo que solo pasa con datos y tráfico reales |
 
 Costo aproximado de cada nivel frente a una prueba unitaria: integración 5 veces más, End-to-End web 20 veces,
 End-to-End móvil 40 veces y UAT 100 veces (son horas de personas). Por eso la meta es más o menos 70% unitarias,
@@ -94,28 +92,37 @@ son el trabajo diario del almacén y donde hoy aparecen los errores. Flutter no 
 Negativo, Límite, Regresión o E2E) y prioridad. Incluir 3 flujos de entrega, casos negativos, casos límite y
 validaciones de datos, y marcar cuáles automatizar y por qué.*
 
-Datos de prueba: operador `OP-312`; pedido a domicilio `ORD-2025-007841` con 2 productos; máximo 50 productos por pedido.
+**Datos de prueba:** operador `OP-312` (contraseña `Pick2025!`); pedido a domicilio `ORD-2025-007841` con 2 productos
+(`SKU-1001` código 7501234567890 y `SKU-2002` código 7501234567891); pedido para tienda `ORD-2025-007842` con 1 producto;
+máximo 50 productos por pedido.
 
-| ID | Módulo | Caso de prueba | Precondiciones | Pasos | Resultado esperado | Tipo | Prioridad | ¿Automatizar? |
-|---|---|---|---|---|---|---|---|---|
-| TC-01 | Preparación | Envío a domicilio completo | Pedido a domicilio asignado | Login, abrir pedido, escanear los 2 productos, confirmar | Se genera la guía; estado "Guía Generada" | E2E | Alta | Sí: es el flujo más usado |
-| TC-02 | Preparación | Recogida en tienda | Pedido para tienda asignado | Escanear, confirmar, marcar listo | Estado "Listo para recoger"; no genera guía | E2E | Alta | Sí |
-| TC-03 | Preparación | Rechazo por producto agotado | Un producto sin existencias | Rechazar, elegir motivo, confirmar | Estado "Pendiente de resurtido"; se avisa al e-commerce | E2E | Alta | Sí |
-| TC-04 | Login | Credenciales inválidas | App instalada | Usuario correcto y contraseña errada | Mensaje "Credenciales inválidas"; no entra | Negativo | Alta | Sí |
-| TC-05 | Preparación | Escáner falla (lectura vacía) | Pedido abierto | Escanear un código dañado | Mensaje "vuelve a escanear"; el avance no cambia | Negativo | Alta | Parcial: la lectura óptica real es manual |
-| TC-06 | Preparación | Producto que no es del pedido | Pedido abierto | Escanear otro producto | Mensaje "no pertenece al pedido"; no avanza | Negativo | Alta | Sí |
-| TC-07 | Preparación | Producto no encontrado en catálogo | Pedido abierto | Digitar un código inexistente | Mensaje "producto no encontrado" | Negativo | Media | Sí |
-| TC-08 | Preparación | Pedido con un solo producto | Pedido con 1 producto | Escanear y confirmar | Avance 1/1; termina bien | Límite | Alta | Sí |
-| TC-09 | Preparación | Pedido con el máximo (50 productos) | Pedido con 50 productos | Escanear los 50 y confirmar | Avance 50/50; la lista se desplaza bien; guía generada | Límite | Media | Sí: datos creados por API |
-| TC-10 | Preparación | Sesión expirada a mitad del trabajo | Sesión de vida corta | Escanear 1, esperar que expire, escanear otro | Pide login de nuevo sin perder lo escaneado | Límite | Alta | Sí |
-| TC-11 | Preparación | Escanear dos veces el mismo producto | Producto ya escaneado | Escanearlo otra vez | Mensaje "ya fue escaneado"; no cuenta doble | Funcional | Alta | Sí |
-| TC-12 | Preparación | Confirmar sin escanear todo | 1 de 2 escaneado | Intentar confirmar | El botón está deshabilitado | Funcional | Alta | Sí |
-| TC-13 | Rechazo | Rechazar sin elegir motivo | Pedido abierto | Rechazar sin motivo | Pide seleccionar un motivo; no cambia el estado | Funcional | Media | Sí |
-| TC-14 | Pedidos | La lista refleja una reasignación | El supervisor reasigna el pedido | Refrescar la lista del operador | El pedido desaparece en menos de 5 segundos | Regresión | Alta | Sí |
+| ID | Módulo | Caso de prueba | Precondiciones | Pasos | Resultado esperado | Tipo | Prioridad |
+|---|---|---|---|---|---|---|---|
+| TC-01 | Preparación / Despacho | Verificar que un pedido a domicilio completo genera la guía de envío | Operador `OP-312` activo. Pedido `ORD-2025-007841` (domicilio, 2 productos) asignado a él | 1. Iniciar sesión con `OP-312`.<br>2. Abrir el pedido `ORD-2025-007841`.<br>3. Escanear el código de `SKU-1001`.<br>4. Escanear el código de `SKU-2002`.<br>5. Tocar "Confirmar preparación" | Cada producto cambia de "Pendiente" a "Escaneado" y el contador pasa a 2/2. Al confirmar se muestra "Guía Generada" con su número (`GUIA-2025-007841`) y el estado del pedido cambia a "Guía Generada" | E2E | Alta |
+| TC-02 | Preparación / Despacho | Verificar que un pedido de recogida en tienda queda "Listo para recoger" | Pedido `ORD-2025-007842` (recogida en tienda, 1 producto) asignado a `OP-312` | 1. Iniciar sesión.<br>2. Abrir el pedido `ORD-2025-007842`.<br>3. Escanear su único producto.<br>4. Tocar "Confirmar preparación" | El estado cambia a "Listo para recoger". **No** se genera guía de envío. El pedido sale de la lista de pendientes del operador | E2E | Alta |
+| TC-03 | Preparación | Verificar el rechazo de un pedido por producto no disponible | Pedido asignado con un producto sin existencias en el almacén | 1. Abrir el pedido.<br>2. Tocar "Rechazar: producto no disponible".<br>3. Seleccionar el motivo "Sin existencias".<br>4. Confirmar el rechazo | El estado cambia a "Pendiente de resurtido". El e-commerce recibe el cambio de estado. El pedido sale de la lista del operador | E2E | Alta |
+| TC-04 | Login | Validar que el login rechaza credenciales inválidas | App instalada; usuario `OP-312` activo | 1. Abrir la app.<br>2. Escribir el usuario `OP-312`.<br>3. Escribir una contraseña incorrecta.<br>4. Tocar "Ingresar" | Se muestra "Credenciales inválidas". La app permanece en la pantalla de login y no muestra pedidos | Negativo | Alta |
+| TC-05 | Preparación | Validar el mensaje cuando el escáner falla (lectura vacía) | Pedido `ORD-2025-007841` abierto, 0 de 2 escaneados | 1. Escanear un código dañado o sin lectura (el escáner envía un texto vacío) | Se muestra "Código vacío, vuelve a escanear". El contador sigue en 0/2 y ningún producto cambia de estado | Negativo | Alta |
+| TC-06 | Preparación | Validar que no se acepta un producto que no pertenece al pedido | Pedido `ORD-2025-007841` abierto | 1. Escanear el código de un producto de otro pedido (7501234567892) | Se muestra "Producto 7501234567892 no pertenece al pedido". El contador no cambia | Negativo | Alta |
+| TC-07 | Preparación | Validar el mensaje para un producto que no existe en el catálogo | Pedido abierto | 1. Digitar manualmente un código que no existe (0000000000000).<br>2. Presionar Enter | Se muestra "Producto no encontrado". El contador no cambia | Negativo | Media |
+| TC-08 | Preparación | Verificar un pedido con un solo producto (límite inferior) | Pedido con 1 producto asignado | 1. Abrir el pedido.<br>2. Escanear el producto.<br>3. Confirmar | El contador muestra 1/1, el botón "Confirmar preparación" se habilita y el pedido termina en el estado que le corresponde | Límite | Alta |
+| TC-09 | Preparación | Verificar un pedido con el máximo de 50 productos (límite superior) | Pedido con 50 productos creado por la API | 1. Abrir el pedido.<br>2. Desplazar la lista y escanear los 50 productos.<br>3. Confirmar | La lista se desplaza sin cortes, el contador llega a 50/50 y se genera la guía. La pantalla responde sin demoras | Límite | Media |
+| TC-10 | Login / Preparación | Verificar que la sesión expirada no pierde el avance del escaneo | Sesión configurada para durar 2 minutos; pedido con 2 productos | 1. Abrir el pedido y escanear 1 producto.<br>2. Esperar a que la sesión expire.<br>3. Escanear el segundo producto | La app pide iniciar sesión de nuevo. Al volver a entrar, el pedido conserva 1/2 escaneado y permite continuar | Límite | Alta |
+| TC-11 | Preparación | Validar que un producto escaneado dos veces no se cuenta doble | Pedido abierto con `SKU-1001` ya escaneado (1/2) | 1. Escanear otra vez el código de `SKU-1001` | Se muestra "Producto SKU-1001 ya fue escaneado". El contador sigue en 1/2 | Funcional | Alta |
+| TC-12 | Preparación | Validar que no se puede confirmar sin escanear todos los productos | Pedido con 2 productos, solo 1 escaneado | 1. Intentar tocar "Confirmar preparación" | El botón está deshabilitado y el pedido no cambia de estado | Funcional | Alta |
+| TC-13 | Rechazo | Validar que el rechazo exige seleccionar un motivo | Pedido abierto | 1. Tocar "Rechazar".<br>2. Confirmar sin seleccionar motivo | Se muestra "Selecciona un motivo". El estado del pedido no cambia | Funcional | Media |
+| TC-14 | Pedidos asignados | Verificar que la lista refleja una reasignación hecha por el supervisor | Pedido asignado a `OP-312` y lista de pedidos abierta | 1. Desde el Centro de Control, reasignar el pedido a `OP-313`.<br>2. Refrescar la lista en la app de `OP-312` | El pedido desaparece de la lista de `OP-312` en menos de 5 segundos y aparece en la de `OP-313` | Regresión | Alta |
 
-**¿Por qué automatizar estos?** Se repiten en cada versión, su resultado es siempre el mismo y sus datos se pueden
-preparar por API. TC-05 es parcial porque depende del hardware. TC-01, 02, 03, 04 y 06 ya están automatizados en el
-repositorio (`tests/mobile/test_pickapp_flow.py`).
+**¿Cuáles automatizar y por qué?**
+
+| Casos | ¿Automatizar? | Por qué |
+|---|---|---|
+| TC-01, 02, 03 | Sí (primero) | Son los 3 flujos de entrega: el trabajo diario del almacén. Se repiten en cada versión |
+| TC-04, 06, 07, 11, 12, 13 | Sí | Resultado siempre igual y fácil de verificar; protegen contra errores que ya ocurrieron |
+| TC-08, 09, 10, 14 | Sí | Los datos (pedidos de 1 y de 50 productos, sesión corta, reasignación) se preparan por API |
+| TC-05 | Parcial | La lectura vacía se simula; la lectura óptica real de un código dañado se prueba a mano con el escáner |
+
+TC-01, 02, 03, 04 y 06 ya están automatizados con Appium y se ejecutaron con éxito (ver Parte 4, Ejercicio C).
 
 ## 2.2 Organización de los casos automatizables (5 puntos)
 
@@ -124,11 +131,11 @@ repositorio (`tests/mobile/test_pickapp_flow.py`).
 - **Suites (grupos de pruebas).** Uso **etiquetas** en cada prueba y armo grupos según la necesidad:
   `smoke` (TC-01 y TC-04, 3 minutos, en cada despliegue), `critical` (si falla, bloquea la entrega),
   `regression` (todas, cada noche) y `quarantine` (pruebas inestables en revisión).
-  Ejemplo: `pytest -m smoke` ejecuta solo las de humo.
+  Ejemplo: con el comando `pytest -m smoke` se ejecutan solo las pruebas de humo.
 - **Prioridad.** Primero lo de mayor **riesgo para el negocio**, lo que **más se repite**, lo que **ya no cambia** y lo
   que se puede probar al **nivel más bajo** (si una regla se prueba por API, no la pruebo por pantalla).
 - **Escáner físico.** Separo la lógica del hardware: en pruebas automáticas **simulo** la lectura escribiendo el
-  código y presionando Enter, como hace el escáner real (`framework/mobile/barcode.py`). Además dejo un **grupo pequeño
+  código y presionando Enter, como hace el escáner real. Además dejo un **grupo pequeño
   de pruebas manuales en un celular real** con el escáner del almacén en cada versión.
 - **Equipo funcional.** Los casos se revisan juntos (negocio, desarrollo y QA) antes de automatizarlos, escritos en
   lenguaje de negocio. Cada error que encuentran en pruebas manuales se convierte en un caso nuevo, y cada dos
@@ -178,7 +185,7 @@ flowchart LR
 | Integration Tests | API con base de datos y mensajes | 4 a 6 min | Pasan todas |
 | UI Tests web | Playwright en Chrome, Firefox y WebKit | 3 a 6 min | Ninguna prueba crítica falla |
 | UI Tests móvil | Appium en varios celulares (emuladores) | 15 a 45 min | Ninguna prueba crítica falla |
-| Smoke Tests | Pruebas rápidas de "¿está vivo?" después de desplegar | 2 a 5 min | Pasan todas |
+| Smoke Tests | Pruebas de humo después de desplegar: verifican que lo esencial funciona (login, consultar y asignar un pedido) | 2 a 5 min | Pasan todas |
 | Quality Gates | Lectura automática de los resultados | segundos | 0 pruebas críticas fallidas y al menos 95% de éxito |
 
 ## 3.2 Mecanismos para que el código defectuoso no llegue a producción (4 puntos)
@@ -232,17 +239,20 @@ herramienta y el patrón; y mostrar código de al menos 1 caso positivo y 1 nega
 - **Constructor de datos:** `assign_payload()` arma un pedido válido y cada prueba cambia solo el dato que le interesa.
 - **Datos propios por prueba:** cada prueba crea su propio pedido, así ninguna depende de otra.
 
-| Tipo | Caso | Resultado esperado |
-|---|---|---|
-| Positivo | Asignar con prioridad NORMAL, URGENT y EXPRESS | 201 Creado y los datos correctos |
-| Negativo | Token vacío, inventado o con firma falsa | 401 No autorizado |
-| Negativo | Pedido inexistente | 404 No encontrado |
-| Negativo | Operador inactivo (`OP-999`) | 422 Operador inactivo |
-| Negativo | Almacén inexistente o con formato inválido | 404 / 400 |
-| Límite | Cada campo vacío o ausente | 400 indicando qué campo |
-| Límite | IDs con formato inválido (minúsculas, dígitos de más) | 400 |
-| Límite | Pedido ya asignado a otro operador | 409 Conflicto; el dueño no cambia |
-| Concurrencia | Dos supervisores asignan el mismo pedido **al mismo tiempo** | Uno gana (201) y el otro recibe 409 |
+Todas las peticiones van a `POST /api/v1/orders/assign` con el token de un supervisor del almacén `WH-05`, salvo que el
+caso diga lo contrario. Cuando hay un error, la API responde siempre con el mismo formato: `{"error": {"code", "message"}}`.
+
+| ID | Tipo | Caso de prueba | Resultado esperado |
+|---|---|---|---|
+| API-01 | Positivo | Verificar la asignación exitosa con prioridad NORMAL, URGENT y EXPRESS (una prueba por prioridad) | Código **201 Creado**. La respuesta trae `status: "ASSIGNED"`, la prioridad enviada, el operador, el almacén y un número de asignación. El pedido aparece asignado a ese operador |
+| API-02 | Negativo | Validar que se rechaza un token vacío, inventado o con firma falsa | **401 No autorizado** con `code: "UNAUTHORIZED"`. El pedido no cambia |
+| API-03 | Negativo | Validar la respuesta para un pedido que no existe (`ORD-2025-999999`) | **404 No encontrado** con `code: "ORDER_NOT_FOUND"` |
+| API-04 | Negativo | Validar que no se puede asignar a un operador inactivo (`OP-999`) | **422** con `code: "OPERATOR_INACTIVE"`. El pedido sigue sin asignar |
+| API-05 | Negativo | Validar los tres tipos de almacén inválido | Almacén que no existe (`WH-99`): **404** `WAREHOUSE_NOT_FOUND`. Formato inválido (`BODEGA-5`): **400** `VALIDATION_ERROR`. Almacén distinto al del pedido: **422** `WAREHOUSE_MISMATCH` |
+| API-06 | Límite | Validar cada campo obligatorio vacío o ausente (`orderId`, `operatorId`, `warehouseId`, `priority`) | **400** con `code: "VALIDATION_ERROR"` y el nombre del campo que falla |
+| API-07 | Límite | Validar IDs con formato inválido (minúsculas, dígitos de más o de menos) | **400** `VALIDATION_ERROR` indicando el campo y el formato esperado |
+| API-08 | Límite | Validar que no se reasigna un pedido ya asignado a otro operador | **409 Conflicto** con `code: "ORDER_ALREADY_ASSIGNED"`. El pedido **sigue** asignado al primer operador |
+| API-09 | Concurrencia | Verificar que dos supervisores que asignan el mismo pedido **al mismo tiempo** no generan una asignación duplicada | Uno recibe **201** y el otro **409**. El pedido queda con un solo operador |
 
 **Código: caso positivo** (`tests/api/test_assign_positive.py`)
 
@@ -295,15 +305,43 @@ pruebas se ejecutan en **Google Chrome, Firefox y WebKit** (el motor de Safari) 
 incorrectos; campos vacíos; caracteres especiales; longitud máxima (50 y 64); contraseña oculta; enlace
 "¿Olvidaste tu contraseña?"; entrar al panel sin sesión regresa al login.
 
-**¿Cómo encontrar los elementos sin que las pruebas se rompan?** (de mejor a peor)
+**¿Cómo encontrar los elementos sin que las pruebas se rompan?** Un **localizador** es la "dirección" que usa la prueba
+para encontrar un elemento en la pantalla (un campo, un botón). Si la dirección cambia, la prueba se rompe.
 
-| Opción | ¿Qué tan estable? | Por qué |
-|---|---|---|
-| **`data-testid`** (mi elección) | Muy estable | Es una etiqueta **solo para pruebas**; no cambia si cambian colores, textos o diseño |
-| Rol + texto visible | Estable | Busca "el botón que dice Entrar"; se rompe si cambian el texto |
-| IDs | Poco estable | En Angular muchos IDs se generan solos (`mat-input-0`) y cambian |
-| Selectores CSS | Poco estable | Dependen de clases de diseño que cambian seguido |
-| XPath | Frágil | Depende de la estructura exacta de la página; cualquier cambio lo rompe |
+**1. `data-testid` (mi elección).** Es un atributo que el desarrollador agrega a cada elemento importante **solo para
+las pruebas**. No se ve en la pantalla y no afecta el diseño. Sirve porque no cambia aunque cambien los colores, los
+textos, el idioma o la estructura de la página. Se acuerda con el equipo de desarrollo (en Angular se escribe en la
+plantilla HTML del componente).
+
+```html
+<input data-testid="login-username" type="text">        <!-- así se marca en el HTML -->
+```
+
+```python
+page.get_by_test_id("login-username")                    # así lo localiza Playwright
+```
+
+**2. Rol + texto visible.** Busca el elemento como lo ve una persona: por su **tipo** (botón, enlace, campo de texto)
+y por el **texto** que muestra. Sirve cuando no hay `data-testid` y, además, confirma que la pantalla es accesible para
+lectores de pantalla. Su debilidad: si cambian el texto (de "Entrar" a "Ingresar") o el idioma, la prueba se rompe.
+
+```html
+<button type="submit">Entrar</button>                    <!-- un botón que dice "Entrar" -->
+```
+
+```python
+page.get_by_role("button", name="Entrar")                # "el botón que dice Entrar"
+```
+
+**Comparación de las opciones (de mejor a peor):**
+
+| Opción | Ejemplo | ¿Qué tan estable? | Por qué |
+|---|---|---|---|
+| **`data-testid`** | `get_by_test_id("login-submit")` | Muy estable | Es solo para pruebas; no cambia con el diseño ni con los textos |
+| Rol + texto visible | `get_by_role("button", name="Entrar")` | Estable | Se rompe si cambian el texto o el idioma |
+| IDs | `#mat-input-0` | Poco estable | En Angular muchos IDs se generan solos y cambian |
+| Selectores CSS | `.btn.btn-primary.mt-2` | Poco estable | Dependen de clases de diseño que cambian seguido |
+| XPath | `//div[2]/form/div[3]/button` | Frágil | Depende de la estructura exacta de la página; cualquier cambio lo rompe |
 
 **Código del caso exitoso**
 
@@ -608,8 +646,12 @@ Resultado real con una prueba de demostración que falla a propósito algunas ve
 *Qué piden: secciones, métricas clave con gráficos sugeridos, si está listo para producción, riesgos con su plan y
 próximos pasos.*
 
-1. **Resumen (1 página).** Estado: 🟡 **no listo para producción todavía**. Se encontraron 23 errores antes de llegar
-   al cliente; 3 son críticos y bloquean la salida; la automatización cubre el 35% de la regresión.
+Esta es la estructura del informe que presentaría a la gerencia, con un ejemplo de su contenido usando los datos
+del enunciado (23 defectos, 3 críticos, 5 de 9 módulos probados, 35% de la regresión automatizada).
+
+1. **Resumen ejecutivo (máximo 1 página del informe).** Estado general con semáforo: **amarillo, no listo para
+   producción todavía**. Se encontraron 23 errores antes de llegar al cliente; 3 son críticos y bloquean la salida; la
+   automatización cubre el 35% de la regresión.
 2. **Avance.** 5 de 9 módulos probados (barra de progreso), 40 pruebas automatizadas (línea de tendencia semanal),
    35% de la regresión automatizada frente a una meta de 70% (indicador tipo velocímetro).
 3. **Calidad del producto.** 23 errores: 3 críticos, 8 altos y 12 medios (barras por severidad) y un mapa de calor
@@ -633,21 +675,25 @@ próximos pasos.*
 *Qué piden: máximo 200 palabras, valor de negocio sin términos técnicos, un ejemplo del proyecto y el retorno de la
 inversión esperado.*
 
-> Porque el equipo manual no alcanza el ritmo del negocio. Publicamos cambios continuamente y hoy revisar a mano todo
-> lo que ya funcionaba toma unos tres días; por eso se revisa solo una parte y los errores llegan a los almacenes.
+> Recomiendo invertir en automatización porque protege la operación de los almacenes y nos permite crecer sin
+> aumentar los errores.
+>
+> Hoy, revisar a mano todo lo que ya funciona toma unos tres días. Como publicamos cambios con frecuencia, el equipo
+> alcanza a revisar solo una parte, y los errores llegan a los almacenes: pedidos sin inventario, pedidos duplicados y
+> entregas retrasadas.
 >
 > Un ejemplo de este proyecto: si un cambio vuelve a permitir que un pedido se asigne a dos operadores, hoy lo
 > descubrimos cuando dos personas preparan el mismo pedido y otro cliente queda sin atender. Con automatización, esa
-> verificación corre sola en minutos, en cada cambio y antes de llegar al almacén.
+> verificación se ejecuta sola en minutos, en cada cambio y antes de llegar al almacén.
 >
-> La automatización no reemplaza a las personas: hace las verificaciones repetitivas para que el equipo se concentre
-> en lo que requiere criterio humano, como probar con escáneres reales en el almacén.
+> La automatización no reemplaza al equipo: asume las revisiones repetitivas y libera a las personas para lo que
+> requiere criterio humano, como probar con escáneres reales en el almacén.
 >
-> Retorno de la inversión esperado: automatizar el 70% de las revisiones libera alrededor de 15 días de trabajo por
-> mes. Con una inversión inicial de unos tres meses, se recupera en aproximadamente seis meses, sin contar el ahorro
-> más importante: menos pedidos retrasados, reprocesos y reclamos de clientes.
+> Retorno esperado: automatizar el 70% de las revisiones libera cerca de 15 días de trabajo al mes. La inversión
+> inicial, de unos tres meses, se recupera en aproximadamente seis meses. A esto se suma el mayor beneficio: menos
+> pedidos retrasados, menos reprocesos y menos reclamos de clientes.
 
-*(172 palabras)*
+*(189 palabras; el límite es 200)*
 
 # Bonus. Análisis de arquitectura y riesgos (20 puntos)
 
@@ -725,3 +771,8 @@ ambientes previos a producción y revisión de código desde QA.*
   completa, el rendimiento y la seguridad antes de cada versión.
 - **Revisión de código desde QA:** una lista de verificación en cada Pull Request: ¿tiene pruebas?, ¿cubre casos de
   error?, ¿qué pasa si dos usuarios lo hacen a la vez?, ¿tiene sus `data-testid`?
+
+# Anexo: código fuente
+
+Todo el código de este documento (pruebas de API, web, móvil, rendimiento, seguridad y los pipelines) está disponible
+y se puede ejecutar: <https://github.com/restrej/prueba-tecnica-cloud-automation-and-mobile>.
