@@ -70,15 +70,11 @@ figure img { max-width: 100%; max-height: 95mm; border: 1px solid #d9dce1; borde
 figure img.terminal { max-height: none; border: none; }
 figcaption { font-size: 8.3pt; color: #5f6670; margin-top: 3px; }
 .con-id td:first-child { white-space: nowrap; }
-/* Matriz de casos (2.1): 9 columnas en hoja vertical. Anchos fijos y palabras largas con guion
-   de división (Precondi-ciones), para que el texto no se salga de la celda ni quede apretado. */
-.matriz { table-layout: fixed; }
-.matriz th, .matriz td { padding: 4px 4px; hyphens: manual; }
-.matriz th:nth-child(1) { width: 8%; }  .matriz th:nth-child(2) { width: 11%; }
-.matriz th:nth-child(3) { width: 14%; } .matriz th:nth-child(4) { width: 12%; }
-.matriz th:nth-child(5) { width: 15%; } .matriz th:nth-child(6) { width: 14%; }
-.matriz th:nth-child(7) { width: 8%; }  .matriz th:nth-child(8) { width: 7%; }
-.matriz th:nth-child(9) { width: 11%; }
+/* Matriz de casos (2.1): 9 columnas en hoja vertical. Ancho automático: cada columna toma al menos el
+   ancho de su palabra más larga, así ningún encabezado ni palabra se corta. Celdas un poco más
+   compactas y encabezado en 7.9 pt para que la tabla quepa en el ancho de la hoja. */
+.matriz th, .matriz td { padding: 4px 3px; }
+.matriz th { font-size: 7.9pt; }
 .pendiente { border: 2px dashed #d29922; background: #fff8e6; padding: 14px;
              text-align: center; color: #7a5a00; }
 """
@@ -165,10 +161,9 @@ def build_html(mermaid_js: str | None) -> str:
     # Tablas cuya primera columna es "ID": el ID no se parte en dos líneas.
     id_header = "<table>\n<thead>\n<tr>\n<th>ID</th>"
     body = body.replace(id_header, id_header.replace("<table>", '<table class="con-id">'))
-    # La matriz de casos (2.1) usa anchos fijos por columna.
+    # La matriz de casos (2.1) lleva su propio estilo (ver .matriz en CSS).
     body = re.sub(r'<table class="con-id">(?=(?:(?!</table>).)*?TC-01)', '<table class="con-id matriz">',
                   body, flags=re.S)
-    body = hyphenate_matrix(body)
     script = ""
     if mermaid_js:
         script = (f"<script>{Path(mermaid_js).read_text(encoding='utf-8')}</script>"
@@ -214,47 +209,6 @@ KEEP_TOGETHER_JS = """
   });
 }
 """
-
-
-SOFT = "\u00ad"
-# Grupos de consonantes que en español no se separan al dividir una palabra (bra-zo, pla-to, ca-rro).
-INSEPARABLE = {"bl", "br", "cl", "cr", "dr", "fl", "fr", "gl", "gr", "pl", "pr", "tr", "ch", "ll", "rr"}
-VOWELS = set("aeiouáéíóúü")
-
-
-def hyphenate(word: str) -> str:
-    """Agrega guiones de división (invisibles salvo al cortar) a una palabra larga, según el español."""
-    if len(word) < 8 or not word.isalpha():
-        return word
-    low, cuts = word.lower(), []
-    i = 1
-    while i < len(low) - 2:
-        if low[i] in VOWELS and low[i + 1] not in VOWELS:
-            j = i + 1
-            while j < len(low) and low[j] not in VOWELS:
-                j += 1
-            consonants = low[i + 1:j]
-            if j < len(low) and 3 <= i + 1 <= len(low) - 3:
-                if len(consonants) == 1 or consonants[-2:] in INSEPARABLE:
-                    cut = i + 1 if len(consonants) == 1 else j - 2
-                else:
-                    cut = j - 1
-                if 2 <= cut <= len(low) - 3:
-                    cuts.append(cut)
-            i = j
-        else:
-            i += 1
-    for cut in reversed(cuts):
-        word = word[:cut] + SOFT + word[cut:]
-    return word
-
-
-def hyphenate_matrix(body: str) -> str:
-    """Aplica la división de palabras solo al texto (no a las etiquetas) de la tabla de la matriz 2.1."""
-    def fix_table(match: re.Match) -> str:
-        return re.sub(r">([^<]+)<", lambda m: ">" + re.sub(r"[^\W\d_]+", lambda w: hyphenate(w.group(0)),
-                                                             m.group(1)) + "<", match.group(0))
-    return re.sub(r'<table class="con-id matriz">.*?</table>', fix_table, body, flags=re.S)
 
 
 # Márgenes amplios: el texto respira más.
