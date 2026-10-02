@@ -10,6 +10,14 @@ tuvieran algo real contra qué ejecutarse.
 *Qué piden: una tabla con 5 niveles de prueba (qué validan, herramientas y riesgos que cubren), qué pruebas correr en
 cada etapa del pipeline y por qué cuestan lo que cuestan.*
 
+| Nivel de prueba | Qué valida | Herramientas | Riesgos que cubre |
+|---|---|---|---|
+| **Unit Tests** (unitarias) | Cada regla de negocio por separado: solo se asignan pedidos con stock, un pedido no puede tener dos operadores, solo supervisores asignan, cálculo de la guía | pytest (Python), `flutter test` (app), Jest (web Angular) | Pedidos sin stock que avanzan; reglas mal programadas. Se detectan en segundos |
+| **Integration Tests** (integración) | La API trabajando con sus piezas reales o simuladas: base de datos, cola de mensajes Pub/Sub, Firestore | pytest + base de datos en contenedor + emuladores de Pub/Sub y Firestore de Google | **Asignaciones duplicadas** (dos personas asignando a la vez), mensajes perdidos entre servicios, tablero que no se actualiza |
+| **Contract Tests** (contrato) | Que el formato acordado entre dos sistemas no cambie sin aviso (por ejemplo, los campos que la app espera recibir) | Pact o JSON Schema | Una actualización de la API que rompe la app ya instalada en los celulares |
+| **End-to-End Tests** (de punta a punta) | El flujo completo como lo vive el usuario: pedido → reserva de stock → asignación → escaneo → guía | Playwright (web), Appium (app móvil) | **Errores intermitentes al escanear**, fallas entre servicios, tablero que no refleja el estado real |
+| **UAT** (aceptación de usuario) | Que supervisores y operadores reales confirmen que la solución sirve para su trabajo, con escáneres físicos | Guiones de prueba manuales en el ambiente de pruebas | Usabilidad en el almacén (guantes, poca luz), reglas mal entendidas, hardware real |
+
 **Idea principal: la "pirámide de pruebas".** Muchas pruebas pequeñas, rápidas y baratas en la base; pocas pruebas
 grandes, lentas y caras arriba. Y probar **lo antes posible**, porque un error encontrado mientras se programa cuesta
 minutos, y el mismo error encontrado en el almacén cuesta pedidos perdidos.
@@ -18,14 +26,6 @@ minutos, y el mismo error encontrado en el almacén cuesta pedidos perdidos.
 flowchart LR
     N["Unitarias<br/>muchas pruebas, segundos"] --> I["Integración"] --> C["Contrato"] --> E["End-to-End<br/>pocas pruebas, minutos"] --> U["UAT<br/>manual, días"]
 ```
-
-| Nivel de prueba | Qué valida | Herramientas | Riesgos que cubre |
-|---|---|---|---|
-| **Unit Tests** (unitarias) | Cada regla de negocio por separado: solo se asignan pedidos con stock, un pedido no puede tener dos operadores, solo supervisores asignan, cálculo de la guía | pytest (Python), `flutter test` (app), Jest (web Angular) | Pedidos sin stock que avanzan; reglas mal programadas. Se detectan en segundos |
-| **Integration Tests** (integración) | La API trabajando con sus piezas reales o simuladas: base de datos, cola de mensajes Pub/Sub, Firestore | pytest + base de datos en contenedor + emuladores de Pub/Sub y Firestore de Google | **Asignaciones duplicadas** (dos personas asignando a la vez), mensajes perdidos entre servicios, tablero que no se actualiza |
-| **Contract Tests** (contrato) | Que el formato acordado entre dos sistemas no cambie sin aviso (por ejemplo, los campos que la app espera recibir) | Pact o JSON Schema | Una actualización de la API que rompe la app ya instalada en los celulares |
-| **End-to-End Tests** (de punta a punta) | El flujo completo como lo vive el usuario: pedido → reserva de stock → asignación → escaneo → guía | Playwright (web), Appium (app móvil) | **Errores intermitentes al escanear**, fallas entre servicios, tablero que no refleja el estado real |
-| **UAT** (aceptación de usuario) | Que supervisores y operadores reales confirmen que la solución sirve para su trabajo, con escáneres físicos | Guiones de prueba manuales en el ambiente de pruebas | Usabilidad en el almacén (guantes, poca luz), reglas mal entendidas, hardware real |
 
 **¿Qué pruebas corro en cada etapa del pipeline?**
 
