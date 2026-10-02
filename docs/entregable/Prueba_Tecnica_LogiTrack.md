@@ -646,7 +646,7 @@ Resultado real con una prueba de demostración que falla a propósito algunas ve
 *Qué piden: secciones, métricas clave con gráficos sugeridos, si está listo para producción, riesgos con su plan y
 próximos pasos.*
 
-Esta es la estructura del informe que presentaría a la gerencia, con un ejemplo de su contenido usando los datos
+Esta es la estructura del informe que presentaría al equipo de liderazgo técnico, con un ejemplo de su contenido usando los datos
 del enunciado (23 defectos, 3 críticos, 5 de 9 módulos probados, 35% de la regresión automatizada).
 
 1. **Resumen ejecutivo (máximo 1 página del informe).** Estado general con semáforo: **amarillo, no listo para
