@@ -26,7 +26,7 @@ OUTPUT = HERE / "Prueba_Tecnica_LogiTrack.pdf"
 
 # Estilos: letra legible, tablas compactas, código con fondo oscuro.
 CSS = """
-body { font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.45; }
+body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.8pt; color: #1d2433; line-height: 1.45; }
 h1 { font-size: 17pt; font-weight: bold; color: #000; border-bottom: 2px solid #000; padding-bottom: 4px;
      margin-top: 26px; page-break-after: avoid; }
 h2 { font-size: 12.5pt; font-weight: bold; color: #0b2e59; margin-top: 18px; border-bottom: 1px solid #c9d4e3; }
@@ -47,6 +47,8 @@ blockquote { border-left: 4px solid #1f6feb; margin: 8px 0; padding: 4px 12px; b
 figure { margin: 8px 0 12px; text-align: center; page-break-inside: avoid; }
 figure img { max-width: 100%; max-height: 85mm; border: 1px solid #c9d4e3; border-radius: 4px; }
 figcaption { font-size: 8.3pt; color: #55627a; }
+.con-id td:first-child { white-space: nowrap; }
+.matriz { font-size: 7.6pt; }
 .pendiente { border: 2px dashed #d29922; background: #fff8e6; padding: 14px;
              text-align: center; color: #7a5a00; }
 """
@@ -105,10 +107,14 @@ def build_html(mermaid_js: str | None) -> str:
     # Imágenes en su propia línea -> figuras incrustadas.
     text = re.sub(r"(?m)^!\[(.*?)\]\((.*?)\)\s*$", image_html, text)
     body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
+    # Tablas cuya primera columna es "ID": el ID no se parte en dos líneas.
+    body = body.replace("<table>\n<thead>\n<tr>\n<th>ID</th>", '<table class="con-id">\n<thead>\n<tr>\n<th>ID</th>')
+    # La matriz de casos (2.1) tiene 9 columnas: letra un poco más pequeña para que quepa.
+    body = re.sub(r'<table class="con-id">(?=(?:(?!</table>).)*?TC-01)', '<table class="con-id matriz">', body, flags=re.S)
     script = ""
     if mermaid_js:
         script = (f"<script>{Path(mermaid_js).read_text(encoding='utf-8')}</script>"
-                  "<script>mermaid.initialize({startOnLoad: true, theme: 'default', themeVariables: {fontFamily: 'Arial, Liberation Sans, sans-serif'}});</script>")
+                  "<script>mermaid.initialize({startOnLoad: true, theme: 'default'});</script>")
     return f"<!doctype html><html lang='es'><head><meta charset='utf-8'><style>{CSS}</style></head>" \
            f"<body>{body}{script}</body></html>"
 

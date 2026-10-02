@@ -48,6 +48,7 @@ End-to-End móvil 40 veces y UAT 100 veces (son horas de personas). Por eso la m
 justificando por el escáner físico y por estar hecha en Flutter.*
 
 **Las dos limitaciones que mandan:**
+
 - **Flutter** dibuja la pantalla por su cuenta, así que las herramientas de automatización no "ven" los botones,
   a menos que el desarrollador les ponga una etiqueta de identificación (`Semantics`). Es como ponerle un código de
   barras a cada botón para que el robot lo encuentre.
@@ -92,35 +93,22 @@ son el trabajo diario del almacén y donde hoy aparecen los errores. Flutter no 
 Negativo, Límite, Regresión o E2E) y prioridad. Incluir 3 flujos de entrega, casos negativos, casos límite y
 validaciones de datos, y marcar cuáles automatizar y por qué.*
 
-**Datos de prueba:** operador `OP-312` (contraseña `Pick2025!`); pedido a domicilio `ORD-2025-007841` con 2 productos
-(`SKU-1001` código 7501234567890 y `SKU-2002` código 7501234567891); pedido para tienda `ORD-2025-007842` con 1 producto;
-máximo 50 productos por pedido.
-
-| ID | Módulo | Caso de prueba | Precondiciones | Pasos | Resultado esperado | Tipo | Prioridad |
-|---|---|---|---|---|---|---|---|
-| TC-01 | Preparación / Despacho | Verificar que un pedido a domicilio completo genera la guía de envío | Operador `OP-312` activo. Pedido `ORD-2025-007841` (domicilio, 2 productos) asignado a él | 1. Iniciar sesión con `OP-312`.<br>2. Abrir el pedido `ORD-2025-007841`.<br>3. Escanear el código de `SKU-1001`.<br>4. Escanear el código de `SKU-2002`.<br>5. Tocar "Confirmar preparación" | Cada producto cambia de "Pendiente" a "Escaneado" y el contador pasa a 2/2. Al confirmar se muestra "Guía Generada" con su número (`GUIA-2025-007841`) y el estado del pedido cambia a "Guía Generada" | E2E | Alta |
-| TC-02 | Preparación / Despacho | Verificar que un pedido de recogida en tienda queda "Listo para recoger" | Pedido `ORD-2025-007842` (recogida en tienda, 1 producto) asignado a `OP-312` | 1. Iniciar sesión.<br>2. Abrir el pedido `ORD-2025-007842`.<br>3. Escanear su único producto.<br>4. Tocar "Confirmar preparación" | El estado cambia a "Listo para recoger". **No** se genera guía de envío. El pedido sale de la lista de pendientes del operador | E2E | Alta |
-| TC-03 | Preparación | Verificar el rechazo de un pedido por producto no disponible | Pedido asignado con un producto sin existencias en el almacén | 1. Abrir el pedido.<br>2. Tocar "Rechazar: producto no disponible".<br>3. Seleccionar el motivo "Sin existencias".<br>4. Confirmar el rechazo | El estado cambia a "Pendiente de resurtido". El e-commerce recibe el cambio de estado. El pedido sale de la lista del operador | E2E | Alta |
-| TC-04 | Login | Validar que el login rechaza credenciales inválidas | App instalada; usuario `OP-312` activo | 1. Abrir la app.<br>2. Escribir el usuario `OP-312`.<br>3. Escribir una contraseña incorrecta.<br>4. Tocar "Ingresar" | Se muestra "Credenciales inválidas". La app permanece en la pantalla de login y no muestra pedidos | Negativo | Alta |
-| TC-05 | Preparación | Validar el mensaje cuando el escáner falla (lectura vacía) | Pedido `ORD-2025-007841` abierto, 0 de 2 escaneados | 1. Escanear un código dañado o sin lectura (el escáner envía un texto vacío) | Se muestra "Código vacío, vuelve a escanear". El contador sigue en 0/2 y ningún producto cambia de estado | Negativo | Alta |
-| TC-06 | Preparación | Validar que no se acepta un producto que no pertenece al pedido | Pedido `ORD-2025-007841` abierto | 1. Escanear el código de un producto de otro pedido (7501234567892) | Se muestra "Producto 7501234567892 no pertenece al pedido". El contador no cambia | Negativo | Alta |
-| TC-07 | Preparación | Validar el mensaje para un producto que no existe en el catálogo | Pedido abierto | 1. Digitar manualmente un código que no existe (0000000000000).<br>2. Presionar Enter | Se muestra "Producto no encontrado". El contador no cambia | Negativo | Media |
-| TC-08 | Preparación | Verificar un pedido con un solo producto (límite inferior) | Pedido con 1 producto asignado | 1. Abrir el pedido.<br>2. Escanear el producto.<br>3. Confirmar | El contador muestra 1/1, el botón "Confirmar preparación" se habilita y el pedido termina en el estado que le corresponde | Límite | Alta |
-| TC-09 | Preparación | Verificar un pedido con el máximo de 50 productos (límite superior) | Pedido con 50 productos creado por la API | 1. Abrir el pedido.<br>2. Desplazar la lista y escanear los 50 productos.<br>3. Confirmar | La lista se desplaza sin cortes, el contador llega a 50/50 y se genera la guía. La pantalla responde sin demoras | Límite | Media |
-| TC-10 | Login / Preparación | Verificar que la sesión expirada no pierde el avance del escaneo | Sesión configurada para durar 2 minutos; pedido con 2 productos | 1. Abrir el pedido y escanear 1 producto.<br>2. Esperar a que la sesión expire.<br>3. Escanear el segundo producto | La app pide iniciar sesión de nuevo. Al volver a entrar, el pedido conserva 1/2 escaneado y permite continuar | Límite | Alta |
-| TC-11 | Preparación | Validar que un producto escaneado dos veces no se cuenta doble | Pedido abierto con `SKU-1001` ya escaneado (1/2) | 1. Escanear otra vez el código de `SKU-1001` | Se muestra "Producto SKU-1001 ya fue escaneado". El contador sigue en 1/2 | Funcional | Alta |
-| TC-12 | Preparación | Validar que no se puede confirmar sin escanear todos los productos | Pedido con 2 productos, solo 1 escaneado | 1. Intentar tocar "Confirmar preparación" | El botón está deshabilitado y el pedido no cambia de estado | Funcional | Alta |
-| TC-13 | Rechazo | Validar que el rechazo exige seleccionar un motivo | Pedido abierto | 1. Tocar "Rechazar".<br>2. Confirmar sin seleccionar motivo | Se muestra "Selecciona un motivo". El estado del pedido no cambia | Funcional | Media |
-| TC-14 | Pedidos asignados | Verificar que la lista refleja una reasignación hecha por el supervisor | Pedido asignado a `OP-312` y lista de pedidos abierta | 1. Desde el Centro de Control, reasignar el pedido a `OP-313`.<br>2. Refrescar la lista en la app de `OP-312` | El pedido desaparece de la lista de `OP-312` en menos de 5 segundos y aparece en la de `OP-313` | Regresión | Alta |
-
-**¿Cuáles automatizar y por qué?**
-
-| Casos | ¿Automatizar? | Por qué |
-|---|---|---|
-| TC-01, 02, 03 | Sí (primero) | Son los 3 flujos de entrega: el trabajo diario del almacén. Se repiten en cada versión |
-| TC-04, 06, 07, 11, 12, 13 | Sí | Resultado siempre igual y fácil de verificar; protegen contra errores que ya ocurrieron |
-| TC-08, 09, 10, 14 | Sí | Los datos (pedidos de 1 y de 50 productos, sesión corta, reasignación) se preparan por API |
-| TC-05 | Parcial | La lectura vacía se simula; la lectura óptica real de un código dañado se prueba a mano con el escáner |
+| ID | Módulo | Caso de prueba | Precondiciones | Pasos | Resultado esperado | Tipo | Prioridad | ¿Automatizar? ¿Por qué? |
+|---|---|---|---|---|---|---|---|---|
+| TC-01 | Preparación / Despacho | Verificar que un pedido a domicilio completo genera la guía de envío | Operador activo con un pedido a domicilio de 2 productos asignado | 1. Iniciar sesión.<br>2. Abrir el pedido.<br>3. Escanear el primer producto.<br>4. Escanear el segundo producto.<br>5. Tocar "Confirmar preparación" | Cada producto cambia a "Escaneado" y el contador llega a 2/2. Se genera la guía de envío y el pedido queda en "Guía Generada" | E2E | Alta | Sí. Es el flujo más usado y se repite en cada versión |
+| TC-02 | Preparación / Despacho | Verificar que un pedido de recogida en tienda queda "Listo para recoger" | Pedido de recogida en tienda asignado al operador | 1. Iniciar sesión.<br>2. Abrir el pedido.<br>3. Escanear sus productos.<br>4. Tocar "Confirmar preparación" | El pedido queda en "Listo para recoger" y **no** se genera guía de envío | E2E | Alta | Sí. Es uno de los 3 flujos de entrega |
+| TC-03 | Preparación | Verificar el rechazo de un pedido por producto no disponible | Pedido asignado con un producto sin existencias | 1. Abrir el pedido.<br>2. Tocar "Rechazar".<br>3. Seleccionar el motivo "Sin existencias".<br>4. Confirmar | El pedido queda en "Pendiente de resurtido" y el e-commerce recibe el cambio | E2E | Alta | Sí. Es uno de los 3 flujos de entrega |
+| TC-04 | Login | Validar que el login rechaza credenciales inválidas | App instalada y usuario activo | 1. Abrir la app.<br>2. Escribir un usuario válido.<br>3. Escribir una contraseña incorrecta.<br>4. Tocar "Ingresar" | Se muestra "Credenciales inválidas" y la app no deja entrar | Negativo | Alta | Sí. Resultado siempre igual; protege el acceso |
+| TC-05 | Preparación | Validar el mensaje cuando el escáner falla | Pedido abierto sin productos escaneados | 1. Escanear un código dañado o que no se puede leer | Se muestra "vuelve a escanear" y el contador no cambia | Negativo | Alta | Parcial. La lectura vacía se simula; la lectura óptica real se prueba a mano |
+| TC-06 | Preparación | Validar que no se acepta un producto que no es del pedido | Pedido abierto | 1. Escanear un producto de otro pedido | Se muestra "no pertenece al pedido" y el contador no cambia | Negativo | Alta | Sí. Evita enviar productos equivocados |
+| TC-07 | Preparación | Validar el mensaje para un producto que no existe en el catálogo | Pedido abierto | 1. Digitar un código que no existe.<br>2. Presionar Enter | Se muestra "Producto no encontrado" y el contador no cambia | Negativo | Media | Sí. Fácil de simular y verificar |
+| TC-08 | Preparación | Verificar un pedido con un solo producto (límite inferior) | Pedido con 1 producto asignado | 1. Abrir el pedido.<br>2. Escanear el producto.<br>3. Confirmar | El contador muestra 1/1, se habilita "Confirmar" y el pedido termina bien | Límite | Alta | Sí. El pedido se crea por API |
+| TC-09 | Preparación | Verificar un pedido con el máximo de 50 productos (límite superior) | Pedido con 50 productos asignado | 1. Abrir el pedido.<br>2. Desplazar la lista y escanear los 50 productos.<br>3. Confirmar | La lista se desplaza sin cortes, el contador llega a 50/50 y se genera la guía | Límite | Media | Sí. A mano es lento y propenso a errores |
+| TC-10 | Login / Preparación | Verificar que la sesión expirada no pierde el avance | Sesión de corta duración; pedido con 2 productos | 1. Escanear 1 producto.<br>2. Esperar a que la sesión expire.<br>3. Escanear el segundo producto | La app pide iniciar sesión de nuevo y, al volver, conserva lo ya escaneado | Límite | Alta | Sí. La sesión corta se configura en el ambiente de pruebas |
+| TC-11 | Preparación | Validar que un producto escaneado dos veces no se cuenta doble | Pedido con un producto ya escaneado | 1. Escanear otra vez el mismo producto | Se muestra "ya fue escaneado" y el contador no aumenta | Funcional | Alta | Sí. Protege contra un error frecuente |
+| TC-12 | Preparación | Validar que no se puede confirmar sin escanear todo | Pedido con productos pendientes por escanear | 1. Intentar tocar "Confirmar preparación" | El botón está deshabilitado y el pedido no cambia | Funcional | Alta | Sí. Resultado siempre igual |
+| TC-13 | Rechazo | Validar que el rechazo exige un motivo | Pedido abierto | 1. Tocar "Rechazar".<br>2. Confirmar sin elegir motivo | Se pide seleccionar un motivo y el pedido no cambia | Funcional | Media | Sí. Resultado siempre igual |
+| TC-14 | Pedidos asignados | Verificar que la lista refleja una reasignación del supervisor | Pedido asignado al operador y su lista abierta | 1. Desde el Centro de Control, reasignar el pedido a otro operador.<br>2. Refrescar la lista del primer operador | El pedido desaparece de su lista en menos de 5 segundos y aparece en la del nuevo operador | Regresión | Alta | Sí. Cubre el problema de asignaciones duplicadas |
 
 TC-01, 02, 03, 04 y 06 ya están automatizados con Appium y se ejecutaron con éxito (ver Parte 4, Ejercicio C).
 
@@ -234,24 +222,24 @@ herramienta y el patrón; y mostrar código de al menos 1 caso positivo y 1 nega
 **Herramienta:** Python + **pytest** (ejecuta las pruebas) + **httpx** (envía las peticiones a la API).
 
 **Patrón (forma de organizar el código):**
+
 - **API Object:** una clase `LogiTrackApi` con un método por acción (`login`, `assign_order`). Las pruebas no
   escriben URLs ni encabezados; si la API cambia, se corrige en un solo lugar.
 - **Constructor de datos:** `assign_payload()` arma un pedido válido y cada prueba cambia solo el dato que le interesa.
 - **Datos propios por prueba:** cada prueba crea su propio pedido, así ninguna depende de otra.
 
-Todas las peticiones van a `POST /api/v1/orders/assign` con el token de un supervisor del almacén `WH-05`, salvo que el
-caso diga lo contrario. Cuando hay un error, la API responde siempre con el mismo formato: `{"error": {"code", "message"}}`.
+Todas las pruebas envían la petición de asignación con el usuario de un supervisor, salvo que el caso diga lo contrario.
 
 | ID | Tipo | Caso de prueba | Resultado esperado |
 |---|---|---|---|
-| API-01 | Positivo | Verificar la asignación exitosa con prioridad NORMAL, URGENT y EXPRESS (una prueba por prioridad) | Código **201 Creado**. La respuesta trae `status: "ASSIGNED"`, la prioridad enviada, el operador, el almacén y un número de asignación. El pedido aparece asignado a ese operador |
-| API-02 | Negativo | Validar que se rechaza un token vacío, inventado o con firma falsa | **401 No autorizado** con `code: "UNAUTHORIZED"`. El pedido no cambia |
-| API-03 | Negativo | Validar la respuesta para un pedido que no existe (`ORD-2025-999999`) | **404 No encontrado** con `code: "ORDER_NOT_FOUND"` |
-| API-04 | Negativo | Validar que no se puede asignar a un operador inactivo (`OP-999`) | **422** con `code: "OPERATOR_INACTIVE"`. El pedido sigue sin asignar |
-| API-05 | Negativo | Validar los tres tipos de almacén inválido | Almacén que no existe (`WH-99`): **404** `WAREHOUSE_NOT_FOUND`. Formato inválido (`BODEGA-5`): **400** `VALIDATION_ERROR`. Almacén distinto al del pedido: **422** `WAREHOUSE_MISMATCH` |
-| API-06 | Límite | Validar cada campo obligatorio vacío o ausente (`orderId`, `operatorId`, `warehouseId`, `priority`) | **400** con `code: "VALIDATION_ERROR"` y el nombre del campo que falla |
-| API-07 | Límite | Validar IDs con formato inválido (minúsculas, dígitos de más o de menos) | **400** `VALIDATION_ERROR` indicando el campo y el formato esperado |
-| API-08 | Límite | Validar que no se reasigna un pedido ya asignado a otro operador | **409 Conflicto** con `code: "ORDER_ALREADY_ASSIGNED"`. El pedido **sigue** asignado al primer operador |
+| API-01 | Positivo | Verificar la asignación exitosa con prioridad NORMAL, URGENT y EXPRESS | **201 Creado**. La respuesta confirma el pedido asignado con la prioridad enviada y el operador elegido |
+| API-02 | Negativo | Validar que se rechaza un token vacío, inventado o con firma falsa | **401 No autorizado**. El pedido no cambia |
+| API-03 | Negativo | Validar la respuesta para un pedido que no existe | **404 No encontrado**, con un mensaje que indica que el pedido no existe |
+| API-04 | Negativo | Validar que no se puede asignar a un operador inactivo | **422**, con un mensaje de operador inactivo. El pedido sigue sin asignar |
+| API-05 | Negativo | Validar que se rechaza un almacén inválido (que no existe, con formato incorrecto o distinto al del pedido) | Un error claro para cada situación (**404**, **400** o **422**). El pedido no cambia |
+| API-06 | Límite | Validar que cada campo obligatorio vacío o ausente es rechazado | **400 Petición inválida**, indicando qué campo falta |
+| API-07 | Límite | Validar que se rechazan identificadores con formato inválido | **400 Petición inválida**, indicando qué campo tiene el formato incorrecto |
+| API-08 | Límite | Validar que no se reasigna un pedido ya asignado a otro operador | **409 Conflicto**. El pedido sigue asignado al primer operador |
 | API-09 | Concurrencia | Verificar que dos supervisores que asignan el mismo pedido **al mismo tiempo** no generan una asignación duplicada | Uno recibe **201** y el otro **409**. El pedido queda con un solo operador |
 
 **Código: caso positivo** (`tests/api/test_assign_positive.py`)
@@ -617,6 +605,7 @@ abajo; (5) corregir la causa y confirmar con 50 ejecuciones seguidas en verde.
 | **Tiempo de espera mal configurado** | Falla justo al llegar al límite (por ejemplo, a los 10 s) y la operación termina a los 12 s | Ajustar el tiempo con datos reales: el tiempo del 99% más un margen |
 
 **Dos casos reales que viví en este proyecto:**
+
 - **Condición de carrera:** sin el bloqueo, dos supervisores "ganan" el mismo pedido (`[201, 201]`) y la prueba lo
   detecta (ver la captura de la Parte 3.3).
 - **Infraestructura:** las pruebas de Appium pasaban en un emulador (Nexus 5) y fallaban en otro (Pixel 6) sin
@@ -646,12 +635,8 @@ Resultado real con una prueba de demostración que falla a propósito algunas ve
 *Qué piden: secciones, métricas clave con gráficos sugeridos, si está listo para producción, riesgos con su plan y
 próximos pasos.*
 
-Esta es la estructura del informe que presentaría al equipo de liderazgo técnico, con un ejemplo de su contenido usando los datos
-del enunciado (23 defectos, 3 críticos, 5 de 9 módulos probados, 35% de la regresión automatizada).
-
-1. **Resumen ejecutivo (máximo 1 página del informe).** Estado general con semáforo: **amarillo, no listo para
-   producción todavía**. Se encontraron 23 errores antes de llegar al cliente; 3 son críticos y bloquean la salida; la
-   automatización cubre el 35% de la regresión.
+1. **Resumen (1 página).** Estado: 🟡 **no listo para producción todavía**. Se encontraron 23 errores antes de llegar
+   al cliente; 3 son críticos y bloquean la salida; la automatización cubre el 35% de la regresión.
 2. **Avance.** 5 de 9 módulos probados (barra de progreso), 40 pruebas automatizadas (línea de tendencia semanal),
    35% de la regresión automatizada frente a una meta de 70% (indicador tipo velocímetro).
 3. **Calidad del producto.** 23 errores: 3 críticos, 8 altos y 12 medios (barras por severidad) y un mapa de calor
